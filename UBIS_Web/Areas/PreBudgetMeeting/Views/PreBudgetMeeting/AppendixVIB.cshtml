@@ -1,0 +1,440 @@
+@model UBIS.Web.Areas.PreBudgetMeeting.Models.AppendixVIBViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Appendix VI-B : Pending Liabilities of Ministries";
+    var yMinus1 = Model.PriorFinancialYear;
+    // Corrected 2026-08-24 per legacy screenshot (supersedes the 2026-08-05 note): the closing
+    // calendar year of FY-1 is shown bare (e.g. "2025"), not the full FY-1 string.
+    var pendingLiabilityAsOnYear = yMinus1.Split('-')[0];
+    var locked = Model.IsEntryLocked;
+    // Bug report 2026-08-31 ("on edit Remarks field is not ediable"): an "@@" Razor-escaped
+    // literal "@" directly inside an HTML attribute VALUE (title="...@@ /...") corrupted the
+    // server's own rendered HTML for that element - confirmed by inspecting the raw HTML the
+    // server actually sent, which already had a stray disabled attribute mid-mangled text before
+    // any client JS ran. A plain C# string built here (where "@" needs no Razor escaping at all)
+    // and interpolated with @remarksTitle sidesteps whatever specifically triggers that Razor
+    // attribute-value parsing bug, instead of just hoping a different "@@" placement doesn't.
+    var remarksTitle = "Up to 500 characters. Allowed special characters: . @ / # $ % , ' ( )";
+
+    // "Approved design for all appendixes" (2026-09-08, UBIS-Pre-budget-html/Appendix6b.html) -
+    // same drawer/grid theme already shipped for Appendix VI-A (AppendixVIA.cshtml), reused here
+    // with VI-B's own real fields/validation/AJAX cascade (see appendix-vib-drawer.js for the new
+    // visual chrome, PreBudget-control-binding.js for the unchanged Category->Scheme->SubScheme
+    // cascade + edit-populate logic this page still relies on).
+}
+
+<div class="ubis-modern-appendix">
+    <section class="appendix-highlight mb-5 rounded-2xl border p-4">
+        <div class="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
+            <div class="flex items-start gap-3">
+                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-cyan-600 text-white shadow-lg shadow-indigo-200">
+                    <i data-lucide="file-spreadsheet" class="h-6 w-6"></i>
+                </div>
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-2xl font-extrabold tracking-tight text-indigo-950">Appendix VI-B</h2>
+                        <span id="vibRecordCountBadge" class="rounded-full bg-white px-3 py-1 text-[10px] font-bold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200">@Model.Records.Count Record@(Model.Records.Count == 1 ? "" : "s")</span>
+                    @if (Model.IsAppendixFrozen)
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="freezedot"></span>Freezed
+                        </span>
+                    }
+                    else if (Model.IsNilSubmitted)
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="freezedot"></span>NIL
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="bluedot"></span>In Progress
+                        </span>
+                    }
+                    </div>
+                    <p class="mt-1.5 text-sm font-medium text-slate-600">Pending Liabilities of Ministries</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                @* Freeze/Nil moved out of the drawer to sit next to Add, per designer markup
+                   (2026-09-08) - see AppendixVIA.cshtml's matching comment. *@
+                @if (Model.Records.Count == 0 && !locked)
+                {
+                    <button type="submit" form="appendixVIBForm" formnovalidate formaction="@Url.Action("SetNilSubmission")"
+                            class="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100">
+                        Nil
+                    </button>
+                }
+                @if (Model.Records.Count > 0 && !locked)
+                {
+                    <button type="submit" form="appendixVIBForm" formnovalidate formaction="@Url.Action("FreezeAppendixTemplate")"
+                            class="inline-flex h-10 items-center justify-center rounded-lg bg-orange-100 px-4 text-sm font-semibold freeze-button shadow-sm transition hover:bg-orange-200 focus:outline-none focus:ring-4 focus:ring-orange-100">
+                        Freeze Data
+                    </button>
+                }
+                @if (!locked)
+                {
+                    <button type="button" data-action="open-appendix-vib-add-drawer"
+                            class="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-ubis-navy px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-ubis-dark focus:outline-none focus:ring-4 focus:ring-blue-100">
+                        <i data-lucide="plus" class="h-4 w-4"></i>Add
+                    </button>
+                }
+            </div>
+        </div>
+    </section>
+
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="mb-4">
+            <p class="text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="status">@Model.StatusMessage</p>
+        </div>
+    }
+
+    <!-- Filter & Context -->
+        <!-- Data Grid -->
+    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
+        <div class="flex flex-col justify-between gap-3 border-b border-slate-100 px-5 py-3.5 sm:flex-row sm:items-center">
+            <div class="relative"><i data-lucide="search" class="absolute left-3 top-3 h-4 w-4 text-slate-400"></i><input id="vibSearchInput" type="search" placeholder="Search category, scheme, sub-scheme..." class="search-control" /></div>
+            <div class="flex items-center gap-2">
+                
+                <div class="relative">
+                    <button id="vibColumnsButton" type="button"
+                            class="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="vibColumnsMenu">
+                        <i data-lucide="columns-3" class="h-3.5 w-3.5"></i> Columns
+                    </button>
+                    <div id="vibColumnsMenu" class="absolute right-0 top-10 z-30 hidden w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl" role="menu" aria-label="Choose visible columns">
+                        <div class="border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-cyan-50 px-4 py-3">
+                            <p class="text-xs font-bold text-slate-800">Visible columns</p>
+                            <p class="mt-0.5 text-[10px] text-slate-500">Choose the information shown in the table.</p>
+                        </div>
+                        <div class="space-y-1 p-2">
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="category" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Category</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="scheme" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Scheme</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="subscheme" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Sub-Scheme</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="pending" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Pending Liability</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="be" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">B.E.</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="estexp" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Estimated Expenditure</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="remarks" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Remarks</label>
+                        </div>
+                        <div class="border-t border-slate-100 bg-slate-50 px-3 py-2.5">
+                            <button type="button" data-action="reset-appendix-vib-columns" class="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50"><i data-lucide="rotate-ccw" class="h-3.5 w-3.5"></i>Reset columns</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="relative">
+                    <button id="vibExportButton" type="button" data-action="toggle-appendix-vib-export-menu"
+                            class="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="vibExportMenu">
+                        <i data-lucide="download" class="h-3.5 w-3.5"></i> Export
+                        <i data-lucide="chevron-down" class="h-3 w-3 text-slate-400"></i>
+                    </button>
+                    <div id="vibExportMenu" class="absolute right-0 top-10 z-30 hidden w-44 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-2xl">
+                        <button type="button" data-action="export-appendix-vib" data-format="pdf"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-rose-600">
+                            <i data-lucide="file-text" class="h-4 w-4 text-rose-500"></i>
+                            <span>PDF</span>
+                        </button>
+                        <button type="button" data-action="export-appendix-vib" data-format="excel"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-emerald-600">
+                            <i data-lucide="sheet" class="h-4 w-4 text-emerald-600"></i>
+                            <span>Excel</span>
+                        </button>
+                        <button type="button" data-action="export-appendix-vib" data-format="csv"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-blue-600">
+                            <i data-lucide="file-spreadsheet" class="h-4 w-4 text-blue-500"></i>
+                            <span>CSV</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="vibGridScroll" class="grid-scroll">
+            <span class="amtmsg">Amount in Crores of Rupees</span>
+            <table id="chargesTable" class="ubis-data-grid">
+                <thead class="ubis-data-grid__head ubis-data-grid__head--plain">
+                    <tr class="data-grid__header-row">
+                        <th class="w-[5%] px-2 py-3 text-center">S.No.</th>
+                        <th data-column="category" class="w-[16%] px-2 py-3">
+                            <button type="button" data-sort-key="category" class="flex items-center gap-1.5">Category</button>
+                        </th>
+                        <th data-column="scheme" class="w-[18%] px-2 py-3">
+                            <button type="button" data-sort-key="scheme" class="flex items-center gap-1">Scheme</button>
+                        </th>
+                        <th data-column="subscheme" class="w-[16%] px-2 py-3">
+                            <button type="button" data-sort-key="subscheme" class="flex items-center gap-1.5">Sub-Scheme</button>
+                        </th>
+                        <th data-column="pending" class="w-[11%] px-2 py-3 text-right"><button type="button" data-sort-key="pending" class="ml-auto flex items-center gap-1">Pending Liability<br>upto 31 Mar @pendingLiabilityAsOnYear</button></th>
+                        <th data-column="be" class="w-[9%] px-2 py-3 text-right"><button type="button" data-sort-key="be" class="ml-auto flex items-center gap-1">B.E.<br>@yMinus1</button></th>
+                        <th data-column="estexp" class="w-[10%] px-2 py-3 text-right"><button type="button" data-sort-key="estexp" class="ml-auto flex items-center gap-1">Estimated Exp.<br>@yMinus1</button></th>
+                        <th data-column="remarks" class="w-[7%] px-2 py-3">Remarks</th>
+                        @if (!locked)
+                        {
+                            <th class="w-[5%] px-2 py-3 text-center">Action</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody id="gridBody" class="divide-y divide-slate-100">
+                    @for (var i = 0; i < Model.Records.Count; i++)
+                    {
+                        var r = Model.Records[i];
+                        var status = r.IsFrozen ? "Frozen" : "Active";
+                        var searchHaystack = string.Join(" ", new[] { r.Id.ToString(), r.CategoryName, r.SchemeName, r.SubSchemeName, status });
+                        <tr data-row data-status="@status" data-search="@searchHaystack"
+                            data-sort-category="@r.CategoryName" data-sort-scheme="@r.SchemeName" data-sort-subscheme="@r.SubSchemeName"
+                            data-sort-pending="@r.PendingLiabilityAsOnMarch31" data-sort-be="@r.BE" data-sort-estexp="@r.EstimatedExpenditure"
+                            class="group border-b border-slate-100 transition odd:bg-white even:bg-slate-50/60 hover:bg-cyan-50/60 @(r.IsFrozen ? "bg-slate-50" : "")">
+                            <td class="relative px-2 py-3 text-center text-xs font-semibold text-slate-600" data-srno>
+                                @if (r.IsFrozen)
+                                {
+                                    <span class="absolute left-0 top-0 bottom-0 w-1 bg-slate-700" title="Frozen record"></span>
+                                }
+                                @(i + 1)
+                            </td>
+                            <td data-column="category" class="break-words px-2 py-3 text-xs font-bold leading-5 text-slate-800">@(r.CategoryName ?? "-")</td>
+                            <td data-column="scheme" class="break-words px-2 py-3 text-xs leading-5 text-slate-600">@(r.SchemeName ?? "-")</td>
+                            <td data-column="subscheme" class="break-words px-2 py-3 text-xs leading-5 text-slate-600">@r.SubSchemeName</td>
+                            <td data-column="pending" class="tabular px-2 py-3 text-right text-xs font-semibold text-slate-800">@(r.PendingLiabilityAsOnMarch31?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="be" class="tabular px-2 py-3 text-right text-xs font-semibold text-slate-800">@(r.BE?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="estexp" class="tabular px-2 py-3 text-right text-xs font-bold text-indigo-800">@(r.EstimatedExpenditure?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="remarks" class="break-words px-2 py-3 text-xs text-slate-500">
+                                @if (string.IsNullOrEmpty(r.Remarks))
+                                {
+                                    @:—
+                                }
+                                else
+                                {
+                                    <span class="via-remarks-clamp" title="@r.Remarks">@r.Remarks</span>
+                                }
+                            </td>
+                            @if (!locked)
+                            {
+                                <td class="grid-action-cell px-2 py-3 text-center">
+                                    @if (!r.IsFrozen)
+                                    {
+                                        <div class="relative inline-block">
+                                            <button type="button" class="row-menu-btn inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                                                    data-action-id="@r.Id" aria-label="Actions for @r.CategoryName" aria-haspopup="true">
+                                                <i data-lucide="more-horizontal" class="h-4 w-4"></i>
+                                            </button>
+                                            <div id="vib-menu-@r.Id" class="action-menu absolute right-0 top-9 z-20 hidden w-40 rounded-xl border border-slate-200 bg-white p-1.5 text-left shadow-xl">
+                                                <button type="button" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
+                                                        data-action="edit-appendix-vib-record"
+                                                        data-id="@r.Id"
+                                                        data-category-id="@r.CategoryId"
+                                                        data-scheme-id="@r.SchemeId"
+                                                        data-sub-scheme-id="@r.SubSchemeId"
+                                                        data-pending-liability-as-on-march31="@r.PendingLiabilityAsOnMarch31"
+                                                        data-be="@r.BE"
+                                                        data-estimated-expenditure="@r.EstimatedExpenditure"
+                                                        data-remarks="@r.Remarks">
+                                                    <i data-lucide="pencil" class="h-3.5 w-3.5"></i>Edit
+                                                </button>
+                                                <button type="button" data-action="delete-appendix-vib-trigger" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-600 hover:bg-red-50">
+                                                    <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>Delete
+                                                </button>
+                                                <form method="post" asp-action="DeleteAppendixVIB" class="hidden">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@r.Id" />
+                                                    <input type="hidden" name="demandId" value="@Model.DemandId" />
+                                                </form>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-xs font-semibold text-slate-500">Frozen</span>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div id="vibEmptyState" class="@(Model.Records.Count == 0 ? "" : "hidden") px-6 py-14 text-center">
+            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                <i data-lucide="search-x" class="h-5 w-5"></i>
+            </div>
+            <h4 class="mt-3 text-sm font-bold text-slate-700">No records found</h4>
+            <p class="mt-1 text-xs text-slate-500">@(Model.Records.Count == 0 ? "No records to display yet." : "Try changing your filters or search criteria.")</p>
+            @if (Model.Records.Count > 0)
+            {
+                <button type="button" data-action="clear-appendix-vib-filters" class="mt-4 rounded-lg bg-ubis-navy px-4 py-2 text-xs font-semibold text-white">Clear Filters</button>
+            }
+        </div>
+
+        <div class="flex flex-col justify-between gap-3 border-t border-slate-100 px-5 py-3 sm:flex-row sm:items-center">
+            <div class="text-[11px] text-slate-500">
+                Showing <span id="vibRangeText" class="font-semibold text-slate-700">@(Model.Records.Count == 0 ? "0" : "1–" + Model.Records.Count)</span> of <span id="vibTotalText" class="font-semibold text-slate-700">@Model.Records.Count</span> records
+            </div>
+            <div class="flex items-center gap-2">
+                <label class="hidden items-center gap-2 text-[11px] text-slate-500 sm:flex">
+                    Rows:
+                    <select id="vibPageSize" data-action="change-appendix-vib-page-size" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                    </select>
+                </label>
+                <button id="vibPrevBtn" type="button" data-action="appendix-vib-prev-page" class="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    <i data-lucide="chevron-left" class="h-3.5 w-3.5"></i> Previous
+                </button>
+                <div id="vibPageNumbers" class="flex items-center gap-1"></div>
+                <button id="vibNextBtn" type="button" data-action="appendix-vib-next-page" class="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    Next <i data-lucide="chevron-right" class="h-3.5 w-3.5"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Drawer backdrop - no data-action="close-appendix-vib-drawer" here, same fix already
+         proven for VI-A ("right side bar menu not close on clicking on form"): the dimmed
+         backdrop shows the page's own grid/filter content through it, so wiring it to close would
+         discard whatever the user had just typed. Only the header's X button and the footer's
+         Cancel button close it. -->
+    <div id="vibDrawerBackdrop" class="ubis-backdrop-hide fixed inset-0 z-[60] bg-slate-950/45 backdrop-blur-[2px] transition-opacity duration-300" aria-hidden="true"></div>
+
+    <!-- Right drawer - the REAL Add/Edit form (same asp-for bindings/POST action as before) -->
+    <aside id="vibDrawer" class="ubis-drawer-closed fixed right-0 top-0 z-[70] flex h-screen w-full max-w-[820px] flex-col border-l border-indigo-100 bg-white shadow-drawer transition-transform duration-300 ease-out" aria-label="Pending liability form" aria-hidden="true">
+        <div class="flex shrink-0 items-center justify-between border-b border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-cyan-50 px-5 py-4">
+            <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-ubis-tealLight text-ubis-teal">
+                    <i data-lucide="file-spreadsheet" class="h-5 w-5"></i>
+                </div>
+                <div>
+                    <h2 id="vibDrawerTitle" class="text-base font-bold text-ubis-navy">Add Pending Liability</h2>
+                    @* <p id="vibDrawerSubtitle" class="text-[11px] text-slate-500">Create a new pending-liability record</p> *@
+                    <div class="mt-1.5 flex flex-wrap items-center gap-2">
+                        <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-800">Demand No. @Model.DemandNo</span>
+                        <span class="text-[10px] font-semibold italic text-red-600">Amount in Crores of Rupees</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <form method="post" autocomplete="off" asp-action="SaveAppendixVIB" id="appendixVIBForm" data-demand-id="@Model.DemandId" data-autosave-key="PreBudget-AppendixVIB-@Model.DemandId" class="flex min-h-0 flex-1 flex-col">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="demandId" value="@Model.DemandId" />
+            <input type="hidden" name="code" value="VI-B" />
+            <input type="hidden" name="appendixId" value="@Model.AppendixId" />
+            <input type="hidden" asp-for="NewRecord.Id" />
+            <fieldset disabled="@locked" style="border:none;margin:0;padding:0;display:contents;">
+            <div class="min-h-0 flex-1 overflow-y-auto bg-slate-50/70 px-5 py-5">
+                @if (Model.IsNilSubmitted)
+                {
+                    <p class="mb-4 rounded-lg border border-teal-100 bg-ubis-tealLight px-3 py-2.5 text-sm text-slate-700">You have marked Nil Data for this Template, so data cannot be entered</p>
+                }
+                <section class="mb-4 rounded-xl border border-slate-200 bg-white">
+                    <div class="grid gap-4 p-4">
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Select Category <span class="text-red-500">*</span></label>
+                            <select id="CategoryId" name="CategoryId" required
+                                    class="form-field h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50">
+                                <option value="">---Select---</option>
+                                @foreach (var category in Model.Categories)
+                                {
+                                    <option value="@category.CategoryId">@category.CategoryName</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Select Scheme <span class="text-red-500">*</span></label>
+                            <select asp-for="NewRecord.SchemeId" required disabled
+                                    class="form-field h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50">
+                                <option value="">Select a Category first</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Select Sub Scheme</label>
+                            <select asp-for="NewRecord.SubSchemeId" disabled
+                                    class="form-field h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50">
+                                <option value="">Select a Scheme first</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid pt-4 pl-3 md:grid-cols-1">
+                        <h3 class="text-sm font-bold text-slate-800">Pending Liability / Estimated Expenditure</h3>
+                    </div>
+                    <div class="grid gap-3 p-4 md:grid-cols-3">
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Pending Liability upto<br>31st March @pendingLiabilityAsOnYear <span class="text-red-500">*</span></p>
+                            <div class="relative mt-2">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.PendingLiabilityAsOnMarch31" />
+                            </div>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">B.E. @yMinus1 <span class="text-red-500">*</span></p>
+                            <div class="relative mt-2">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-slate-100 pl-7 pr-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required readonly title="Auto-loaded from SBEData for the selected Category/Scheme" asp-for="NewRecord.BE" />
+                            </div>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Estimated Expenditure in @yMinus1 <span class="text-red-500">*</span></p>
+                            <div class="relative mt-2">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-800 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.EstimatedExpenditure" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-4">
+                        <label class="mb-1.5 block text-xs font-semibold text-slate-700">Remarks</label>
+                        <textarea id="NewRecord_Remarks" name="NewRecord.Remarks" maxlength="500" rows="4" placeholder="Enter remarks..." data-mask="vib-remarks" title="@remarksTitle"
+                                  class="RemarksText w-full resize-none rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-ubis-teal focus:ring-4 focus:ring-teal-50">@Model.NewRecord.Remarks</textarea>
+                        <div class="mt-1.5 text-right text-[10px] text-slate-400"><span id="vibCharCount">@(Model.NewRecord.Remarks?.Length ?? 0)</span> / 500</div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="flex shrink-0 items-center justify-end border-t border-slate-200 bg-white px-5 py-3.5">
+                <div class="flex items-center gap-2">
+                    <button type="reset" class="h-9 rounded-lg border border-ubis-navy px-3.5 text-xs font-semibold text-ubis-navy hover:bg-blue-50">Clear</button>
+                    <button type="button" data-action="close-appendix-vib-drawer" class="h-9 rounded-lg border border-slate-300 px-3.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                    <button type="submit" class="h-9 rounded-lg bg-ubis-teal px-4 text-xs font-bold text-white shadow-sm hover:bg-teal-700">Save Record</button>
+                    <button type="button" class="hidden" data-action="cancel-edit"></button>
+                </div>
+            </div>
+            </fieldset>
+        </form>
+    </aside>
+
+    <!-- Toast -->
+    <div id="vibToast" class="ubis-toast-hide ubis-toast-success fixed bottom-5 right-5 z-[100] flex w-[calc(100%-2rem)] max-w-sm items-start gap-3 rounded-xl border bg-white p-4 shadow-2xl transition-all duration-300" aria-live="polite" aria-atomic="true">
+        <div class="ubis-toast-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-full">
+            <i id="vibToastIcon" data-lucide="check-circle-2" class="h-4 w-4"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+            <p id="vibToastTitle" class="text-xs font-bold text-slate-800">Success</p>
+            <p id="vibToastMessage" class="mt-0.5 text-[11px] text-slate-500"></p>
+        </div>
+        <button id="vibToastClose" type="button" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-4 focus:ring-slate-100" aria-label="Close notification"><i data-lucide="x" class="h-4 w-4"></i></button>
+    </div>
+
+    <!-- Delete confirmation dialog -->
+    <div id="vibDeleteDialog" class="ubis-dialog-hide fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px] transition-opacity duration-200" role="dialog" aria-modal="true" aria-labelledby="vibDeleteDialogTitle" aria-hidden="true">
+        <div class="ubis-dialog-card w-full max-w-md rounded-2xl border border-red-100 bg-white p-5 shadow-2xl transition-all duration-200">
+            <div class="flex items-start gap-4">
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                    <i data-lucide="trash-2" class="h-5 w-5"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <h2 id="vibDeleteDialogTitle" class="text-base font-bold text-slate-900">Delete</h2>
+                    <p class="mt-1 text-sm leading-5 text-slate-500">Are you sure you want to delete?</p>
+                    <p id="vibDeleteRecordName" class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800"></p>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end gap-2">
+                <button id="vibCancelDeleteBtn" type="button" class="h-10 rounded-lg border border-slate-300 px-4 text-xs font-bold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100">Cancel</button>
+                <button id="vibConfirmDeleteBtn" type="button" class="inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-100"><i data-lucide="trash-2" class="h-4 w-4"></i>Delete record</button>
+            </div>
+        </div>
+    </div>
+</div>

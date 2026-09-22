@@ -1,0 +1,154 @@
+﻿@model UBIS.Web.Areas.PreBudgetMeeting.Models.PreBudgetSelectorViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Pre-Budget Data and Report";
+}
+@{
+    // Breadcrumb restyled 2026-09-10 to the PreBudget designer header (chevron-separated, last
+    // segment as an indigo pill). Controller still supplies ViewData["Breadcrumb"] as a
+    // "A / B / C" string - split and rendered here.
+    var crumbs = ((ViewData["Breadcrumb"] as string) ?? "Pre-Budget Meeting / Data Entry / Appendix Data Entry")
+        .Split('/', StringSplitOptions.RemoveEmptyEntries).Select(c => c.Trim()).Where(c => c.Length > 0).ToArray();
+}
+<div class="mb-4 flex flex-wrap items-center gap-2 text-[11px]">
+    @for (var i = 0; i < crumbs.Length; i++)
+    {
+        if (i > 0)
+        {
+            <i data-lucide="chevron-right" class="h-3 w-3 text-slate-300"></i>
+        }
+        if (i == crumbs.Length - 1)
+        {
+            <span class="rounded-full bg-indigo-100 px-2.5 py-1 font-bold text-indigo-800 ring-1 ring-inset ring-indigo-200">@crumbs[i]</span>
+        }
+        else
+        {
+            <span class="text-slate-400">@crumbs[i]</span>
+        }
+    }
+</div>
+
+<section class="mb-5 rounded-2xl border border-slate-100 bg-white p-5 shadow-panel dark:border-slate-800 dark:bg-slate-900 animate-fade-in">
+    @{
+        // Client requirement 2026-08-27: "if user role is Single Demand User, Remove Demand
+        // Dropdown, Demand should be highlighted with Label". Keyed off Demands.Count == 1. The
+        // <select id="demandSelect"> stays in the DOM either way (visually hidden when single) so
+        // pre-budget-meeting.js's autoSelectIfSingleOption bootstrap keeps working unchanged.
+        var isSingleDemand = Model.Demands.Count == 1;
+    }
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <label class="block min-w-0" style="@(isSingleDemand ? "display:none" : null)">
+            <span class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-500">Demand</span>
+            <div class="relative">
+                <select id="demandSelect" class="h-12 w-full appearance-none truncate rounded-lg border border-slate-300 bg-slate-50 px-3 pr-10 text-sm font-medium text-slate-700 outline-none transition hover:border-slate-400 focus:border-ubis-teal focus:bg-white focus:ring-4 focus:ring-teal-50" aria-label="Select Demand">
+                    <option value="">Select Demand</option>
+                    @foreach (var demand in Model.Demands)
+                    {
+                        <option value="@demand.DemandId" selected="@(demand.DemandId == Model.SelectedDemandId ? "selected" : null)">@demand.DemandNo - @demand.DemandName</option>
+                    }
+                </select>
+                <i data-lucide="chevron-down" class="pointer-events-none absolute right-3 top-4 h-4 w-4 text-slate-700"></i>
+            </div>
+        </label>
+        @if (isSingleDemand)
+        {
+            <div class="block min-w-0">
+                <span class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-500">Demand</span>
+                <div class="flex h-12 w-full items-center truncate rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm font-semibold text-slate-700">@Model.Demands[0].DemandNo - @Model.Demands[0].DemandName</div>
+            </div>
+        }
+        <label class="block min-w-0">
+            <span class="mb-2 block text-xs font-extrabold uppercase tracking-wide text-slate-500">Appendix</span>
+            <div class="relative">
+                <select id="appendixSelect" class="h-12 w-full appearance-none truncate rounded-lg border border-slate-300 bg-slate-50 px-3 pr-10 text-sm font-medium text-slate-700 outline-none transition hover:border-slate-400 focus:border-ubis-teal focus:bg-white focus:ring-4 focus:ring-teal-50" aria-label="Select Appendix" disabled>
+                    <option value="">Select Appendix</option>
+                </select>
+                <i data-lucide="chevron-down" class="pointer-events-none absolute right-3 top-4 h-4 w-4 text-slate-700"></i>
+            </div>
+        </label>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <p class="mt-3 text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="status">@Model.StatusMessage</p>
+    }
+    <p id="appendixStatus" class="mt-2 text-sm font-semibold text-slate-500 empty:hidden" role="status" aria-live="polite"></p>
+</section>
+
+@* Client requirement 2026-08-27 (screenshot): the "Select a Demand"/"Select an Appendix" nudge
+   panel is suppressed for a Single Demand user (they have a label, not a dropdown) via
+   data-single-demand, read by pre-budget-meeting.js's showPlaceholder(). *@
+<section class="p-0 animate-fade-in mt-5">
+<div id="partialViewContainer" aria-live="polite" aria-busy="false" data-single-demand="@(isSingleDemand ? "true" : "false")">
+    @if (!isSingleDemand)
+    {
+        <section class="pre-budget-placeholder">
+            <div class="pre-budget-placeholder-icon"><i data-lucide="folder-open"></i></div>
+            <div><h3>Select a Demand</h3><p>Choose a Demand above, then an Appendix, to view or enter Pre-Budget data.</p></div>
+         </section> 
+    }
+</div>
+</section>
+
+@section Scripts {
+    @* Must load before pre-budget-meeting.js - that file calls window.PreBudgetControlBinding.init()/
+       window.PreBudgetValidation.init() synchronously during its own DOMContentLoaded handler. *@
+    <script src="~/js/PreBudget-control-binding.js" asp-append-version="true"></script>
+    <script src="~/js/PreBudget-validation.js" asp-append-version="true"></script>
+    <script src="~/js/pre-budget-meeting.js" asp-append-version="true"></script>
+    @* Generic grid-to-Excel/PDF/CSV exporter (2026-09-15) - scrapes whichever grid it's pointed at
+       directly from the DOM (headers/colspan-rowspan/visible columns/right-alignment), so an
+       appendix's export never drifts out of sync with its own grid again. Loaded before any
+       appendix-*-drawer.js file so they can call window.UbisGridExport.exportTable. *@
+    <script src="~/js/grid-export.js" asp-append-version="true"></script>
+    @* "Approved design for all appendixes" (2026-09-03) - wraps window.PreBudgetControlBinding's
+       onFragmentApplied, so it must load after PreBudget-control-binding.js. First consumer:
+       AppendixVIA.cshtml's redesigned drawer/grid. *@
+    <script src="~/js/appendix-via-drawer.js" asp-append-version="true"></script>
+    @* Same redesign, extended 2026-09-08 to Appendix VI-B/VI-C (Appendix6b.html/Appendix6c.html). *@
+    <script src="~/js/appendix-vib-drawer.js" asp-append-version="true"></script>
+    <script src="~/js/appendix-vic-drawer.js" asp-append-version="true"></script>
+    @* Same redesign, extended 2026-09-08 to Appendix VI-D (Appendix6d.html). *@
+    <script src="~/js/appendix-vid-drawer.js" asp-append-version="true"></script>
+    @* Same redesign, extended 2026-09-08 to Appendix VI-E (Appendix6e.html's drawer/form section). *@
+    <script src="~/js/appendix-vie-drawer.js" asp-append-version="true"></script>
+    @* Same redesign, extended 2026-09-08 to the rest of PreBudget's appendixes beyond VI-A..E,
+       starting with Appendix II - see ubis2_appendix_redesign_reuse_shared_files memory. *@
+    <script src="~/js/appendix-ii-drawer.js" asp-append-version="true"></script>
+    <script src="~/js/appendix-i-drawer.js" asp-append-version="true"></script>
+    <script src="~/js/appendix-ia-drawer.js" asp-append-version="true"></script>
+    <script src="~/js/appendix-iii-drawer.js" asp-append-version="true"></script>
+    <script src="~/js/appendix-iiia-drawer.js" asp-append-version="true"></script>
+    <script src="~/js/appendix-vif-drawer.js" asp-append-version="true"></script>
+    <script src="~/js/appendix-vig-drawer.js" asp-append-version="true"></script>
+    @* appendix-vgroup-drawer.js REMOVED 2026-09-16 - it was dead code left over from the old tabbed
+       AppendixVGroup.cshtml page (split into standalone AppendixVA/VB/VC.cshtml on 2026-09-14), but
+       its document-level click listener still matched the SAME live [data-action="close-appendix-
+       v{a,b,c}-drawer"] buttons on the new pages via its prefix-parametrized closeDrawer(prefix).
+       Since this script loaded BEFORE appendix-va/vb/vc-drawer.js, its listener fired FIRST and
+       closed the drawer immediately with no confirmation - then the new file's listener ran anyway
+       and popped the Cancel confirm dialog on an already-closed drawer ("sidebar hides without
+       waiting for the confirmation box" bug report). Deleting the file entirely: every purpose it
+       served (toast/drawer open-close/delete dialog/search/pagination) is now fully duplicated,
+       correctly, in appendix-va-drawer.js/appendix-vb-drawer.js/appendix-vc-drawer.js. *@
+    <script src="~/js/appendix-iiib-drawer.js" asp-append-version="true"></script>
+    <script src="~/js/appendix-vi-drawer.js" asp-append-version="true"></script>
+    <script src="~/js/appendix-viia-drawer.js" asp-append-version="true"></script>
+    <script src="~/js/appendix-viib-drawer.js" asp-append-version="true"></script>
+    @* Same redesign, extended 2026-09-14 to Appendix IV-A (design reference: UBIS-drawer-070926
+       "appendix-IV.html"). *@
+    <script src="~/js/appendix-iva-drawer.js" asp-append-version="true"></script>
+    @* Same redesign, extended 2026-09-15 to plain Appendix IV (same designer reference). *@
+    <script src="~/js/appendix-iv-drawer.js" asp-append-version="true"></script>
+    @* Same redesign, extended 2026-09-15 to Appendix IV-B (design reference: UBIS-drawer-070926
+       "appendix-IVB.html"). *@
+    <script src="~/js/appendix-ivb-drawer.js" asp-append-version="true"></script>
+    @* Same redesign, extended 2026-09-14 to Appendix V-A/V-B/V-C (design reference:
+       UBIS-drawer-070926 "Appendix-V-A/B/C.html") - split out of the former tabbed
+       AppendixVGroup.cshtml into 3 standalone pages, each with its own dedicated drawer JS file. *@
+    <script src="~/js/appendix-va-drawer.js" asp-append-version="true"></script>
+    <script src="~/js/appendix-vb-drawer.js" asp-append-version="true"></script>
+    <script src="~/js/appendix-vc-drawer.js" asp-append-version="true"></script>
+    @* Appendix V (consolidated summary) - Columns/Export toolbar added 2026-09-16, matching V-A's
+       format. Page itself remains a pure read-only rollup of V-A+V-B+V-C - no drawer, no entity. *@
+    <script src="~/js/appendix-v-summary-drawer.js" asp-append-version="true"></script>
+}

@@ -1,0 +1,504 @@
+@model UBIS.Web.Areas.PreBudgetMeeting.Models.AppendixVIAViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Appendix VI-A : List of User Charges levied by the Departments/Ministries";
+    var y1 = Model.YearOffset(-4);
+    var y2 = Model.YearOffset(-3);
+    var y3 = Model.YearOffset(-2);
+    var locked = Model.IsEntryLocked;
+
+    // "Approved design for all appendixes" (2026-09-03, UBIS-One-Screen-html prototype) - see
+    // Appendix_vi_old.cshtml for the previous inline-table layout this replaces, and
+    // wwwroot/css/appendix-drawer-design.css / wwwroot/js/appendix-via-drawer.js for the shared
+    // design system this page is the first consumer of.
+}
+
+<div class="ubis-modern-appendix">
+    <section class="appendix-highlight mb-5 rounded-2xl border p-4">
+        <div class="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
+            <div class="flex items-start gap-3">
+                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-cyan-600 text-white shadow-lg shadow-indigo-200">
+                    <i data-lucide="file-spreadsheet" class="h-6 w-6"></i>
+                </div>
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-2xl font-extrabold tracking-tight text-indigo-950">Appendix VI-A</h2>
+                        <span id="viaRecordCountBadge" class="rounded-full bg-white px-3 py-1 text-[10px] font-bold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200">@Model.Records.Count Record@(Model.Records.Count == 1 ? "" : "s")</span>
+                    @if (Model.IsAppendixFrozen)
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="freezedot"></span>Freezed
+                        </span>
+                    }
+                    else if (Model.IsNilSubmitted)
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="freezedot"></span>NIL
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="bluedot"></span>In Progress
+                        </span>
+                    }
+                    </div>
+                    <p class="mt-1.5 text-sm font-medium text-slate-600">List of User Charges levied by the Departments/Ministries</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                @* Freeze/Nil moved out of the drawer to sit next to Add, per designer markup
+                   (2026-09-08) - same real SetNilSubmission/FreezeAppendixTemplate actions as
+                   before, just posted via the HTML `form` attribute since these buttons no longer
+                   live inside <form id="appendixVIAForm">. Freeze only shows once there is at
+                   least one record to freeze; Nil only shows while there are none yet. *@
+                @if (Model.Records.Count == 0 && !locked)
+                {
+                    <button type="submit" form="appendixVIAForm" formnovalidate formaction="@Url.Action("SetNilSubmission")"
+                            class="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100">
+                        Nil
+                    </button>
+                }
+                @if (Model.Records.Count > 0 && !locked)
+                {
+                    <button type="submit" form="appendixVIAForm" formnovalidate formaction="@Url.Action("FreezeAppendixTemplate")"
+                            class="inline-flex h-10 items-center justify-center rounded-lg bg-orange-100 px-4 text-sm font-semibold freeze-button shadow-sm transition hover:bg-orange-200 focus:outline-none focus:ring-4 focus:ring-orange-100">
+                        Freeze Data
+                    </button>
+                }
+                @if (!locked)
+                {
+                    <button type="button" data-action="open-appendix-via-add-drawer"
+                            class="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-ubis-navy px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-ubis-dark focus:outline-none focus:ring-4 focus:ring-blue-100">
+                        <i data-lucide="plus" class="h-4 w-4"></i>Add
+                    </button>
+                }
+            </div>
+        </div>
+    </section>
+
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="mb-4">
+            <p class="text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="status">@Model.StatusMessage</p>
+        </div>
+    }
+
+    <!-- Filter & Context -->
+        <!-- Data Grid -->
+    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
+        <div class="flex flex-col justify-between gap-3 border-b border-slate-100 px-5 py-3.5 sm:flex-row sm:items-center">
+            <div class="relative"><i data-lucide="search" class="absolute left-3 top-3 h-4 w-4 text-slate-400"></i><input id="viaSearchInput" type="search" placeholder="Search charge, department, ID..." class="search-control" /></div>
+            <div class="flex items-center gap-2">
+               
+                <div class="relative">
+                    <button id="viaColumnsButton" type="button"
+                            class="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="viaColumnsMenu">
+                        <i data-lucide="columns-3" class="h-3.5 w-3.5"></i> Columns
+                    </button>
+                    <div id="viaColumnsMenu" class="absolute right-0 top-10 z-30 hidden w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl" role="menu" aria-label="Choose visible columns">
+                        <div class="border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-cyan-50 px-4 py-3">
+                            <p class="text-xs font-bold text-slate-800">Visible columns</p>
+                            <p class="mt-0.5 text-[10px] text-slate-500">Choose the information shown in the table.</p>
+                        </div>
+                        <div class="space-y-1 p-2">
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="charge" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">User Charge</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="services" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Services</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="department" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Organisation/Department</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="rev22" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Revenue @y1</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="rev23" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Revenue @y2</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="rev24" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Revenue @y3</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="remarks" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Remarks</label>
+                        </div>
+                        <div class="border-t border-slate-100 bg-slate-50 px-3 py-2.5">
+                            <button type="button" data-action="reset-appendix-via-columns" class="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50"><i data-lucide="rotate-ccw" class="h-3.5 w-3.5"></i>Reset columns</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="relative">
+                    <button id="viaExportButton" type="button" data-action="toggle-appendix-via-export-menu"
+                            class="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="viaExportMenu">
+                        <i data-lucide="download" class="h-3.5 w-3.5"></i> Export
+                        <i data-lucide="chevron-down" class="h-3 w-3 text-slate-400"></i>
+                    </button>
+                    <div id="viaExportMenu" class="absolute right-0 top-10 z-30 hidden w-44 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-2xl">
+                        <button type="button" data-action="export-appendix-via" data-format="pdf"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-rose-600">
+                            <i data-lucide="file-text" class="h-4 w-4 text-rose-500"></i>
+                            <span>PDF</span>
+                        </button>
+                        <button type="button" data-action="export-appendix-via" data-format="excel"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-emerald-600">
+                            <i data-lucide="sheet" class="h-4 w-4 text-emerald-600"></i>
+                            <span>Excel</span>
+                        </button>
+                        <button type="button" data-action="export-appendix-via" data-format="csv"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-blue-600">
+                            <i data-lucide="file-spreadsheet" class="h-4 w-4 text-blue-500"></i>
+                            <span>CSV</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="viaGridScroll" class="grid-scroll">
+            <span class="amtmsg">Amount in Crores of Rupees</span>
+            <table id="chargesTable" class="ubis-data-grid">
+                <thead class="ubis-data-grid__head ubis-data-grid__head--plain">
+                    <tr class="data-grid__header-row">
+                        <th class="w-[5%] px-2 py-3 text-center">S.No.</th>
+                        <th data-column="charge" class="w-[13%] px-2 py-3">
+                            <button type="button" data-sort-key="charge" class="flex items-center gap-1.5">Title of the User Charge</button>
+                        </th>
+                        <th data-column="services" class="w-[20%] px-2 py-3">
+                            <button type="button" data-sort-key="services" class="flex items-center gap-1">Services for which the User Charge is levied</button>
+                        </th>
+                        <th data-column="department" class="w-[20%] px-2 py-3">
+                            <button type="button" data-sort-key="department" class="flex items-center gap-1.5">Organisation/Department</button>
+                        </th>
+                        <th data-column="rev22" class="w-[10%] px-2 py-3 text-right"><button type="button" data-sort-key="rev22" class="ml-auto flex items-center gap-1">Total Revenue<br>@y1</button></th>
+                        <th data-column="rev23" class="w-[10%] px-2 py-3 text-right"><button type="button" data-sort-key="rev23" class="ml-auto flex items-center gap-1">Total Revenue<br>@y2</button></th>
+                        <th data-column="rev24" class="w-[10%] px-2 py-3 text-right"><button type="button" data-sort-key="rev24" class="ml-auto flex items-center gap-1">Total Revenue<br>@y3</button></th>
+                        <th data-column="remarks" class="w-[7%] px-2 py-3">Remarks</th>
+                        @if (!locked)
+                        {
+                            <th class="w-[5%] px-2 py-3 text-center">Action</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody id="gridBody" class="divide-y divide-slate-100">
+                    @for (var i = 0; i < Model.Records.Count; i++)
+                    {
+                        var r = Model.Records[i];
+                        var status = r.IsFrozen ? "Frozen" : "Active";
+                        var searchHaystack = string.Join(" ", new[] { r.Id.ToString(), r.TitleOfCharge, r.OrgDept, status });
+                        <tr data-row data-status="@status" data-search="@searchHaystack"
+                            data-sort-charge="@r.TitleOfCharge" data-sort-services="@r.Service" data-sort-department="@r.OrgDept"
+                            data-sort-rev22="@r.TotalRevenueY1" data-sort-rev23="@r.TotalRevenueY2" data-sort-rev24="@r.TotalRevenueY3"
+                            class="group border-b border-slate-100 transition odd:bg-white even:bg-slate-50/60 hover:bg-cyan-50/60 @(r.IsFrozen ? "bg-slate-50" : "")">
+                            <td class="relative px-2 py-3 text-center text-xs font-semibold text-slate-600" data-srno>
+                                @if (r.IsFrozen)
+                                {
+                                    <span class="absolute left-0 top-0 bottom-0 w-1 bg-slate-700" title="Frozen record"></span>
+                                }
+                                @(i + 1)
+                            </td>
+                            <td data-column="charge" class="break-words px-2 py-3 text-xs font-bold leading-5 text-slate-800">@r.TitleOfCharge</td>
+                            <td data-column="services" class="break-words px-2 py-3 text-xs leading-5 text-slate-600">@r.Service</td>
+                            <td data-column="department" class="break-words px-2 py-3 text-xs leading-5 text-slate-600">@r.OrgDept</td>
+                            <td data-column="rev22" class="tabular px-2 py-3 text-right text-xs font-semibold text-slate-800">@(r.TotalRevenueY1?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="rev23" class="tabular px-2 py-3 text-right text-xs font-semibold text-slate-800">@(r.TotalRevenueY2?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="rev24" class="tabular px-2 py-3 text-right text-xs font-bold text-indigo-800">@(r.TotalRevenueY3?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="remarks" class="break-words px-2 py-3 text-xs text-slate-500">
+                                @if (string.IsNullOrEmpty(r.Remarks))
+                                {
+                                    @:—
+                                }
+                                else
+                                {
+                                    <span class="via-remarks-clamp" title="@r.Remarks">@(r.Remarks.Length>20 ? r.Remarks.Substring(0, 20) +"..." : r.Remarks)</span>
+                                }
+                            </td>
+                            @if (!locked)
+                            {
+                                <td class="grid-action-cell px-2 py-3 text-center">
+                                    @if (!r.IsFrozen)
+                                    {
+                                        <div class="relative inline-block">
+                                            <button type="button" class="row-menu-btn inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                                                    data-action-id="@r.Id" aria-label="Actions for @r.TitleOfCharge" aria-haspopup="true">
+                                                <i data-lucide="more-horizontal" class="h-4 w-4"></i>
+                                            </button>
+                                            <div id="via-menu-@r.Id" class="action-menu absolute right-0 top-9 z-20 hidden w-40 rounded-xl border border-slate-200 bg-white p-1.5 text-left shadow-xl">
+                                                <button type="button" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
+                                                        data-action="edit-appendix-via-record"
+                                                        data-id="@r.Id"
+                                                        data-title-of-charge="@r.TitleOfCharge"
+                                                        data-service="@r.Service"
+                                                        data-org-dept="@r.OrgDept"
+                                                        data-rate-of-charge="@r.RateOfCharge"
+                                                        data-unit-of-collection="@r.UnitOfCollection"
+                                                        data-date-of-rate-fixation="@(r.DateOfRateFixation?.ToString("yyyy-MM-dd"))"
+                                                        data-fixation-statute="@r.FixationStatute"
+                                                        data-total-revenue-y1="@r.TotalRevenueY1"
+                                                        data-total-revenue-y2="@r.TotalRevenueY2"
+                                                        data-total-revenue-y3="@r.TotalRevenueY3"
+                                                        data-competent-authority="@r.CompetentAuthority"
+                                                        data-period-of-fixation="@r.PeriodOfFixation"
+                                                        data-salary="@r.Salary"
+                                                        data-office-expenses="@r.OfficeExpenses"
+                                                        data-other-expenses="@r.OtherExpenses"
+                                                        data-is-collection-cost-higher="@r.IsCollectionCostHigher.ToString().ToLowerInvariant()"
+                                                        data-is-trans-cost-higher="@r.IsTransCostHigher.ToString().ToLowerInvariant()"
+                                                        data-remarks="@r.Remarks">
+                                                    <i data-lucide="pencil" class="h-3.5 w-3.5"></i>Edit
+                                                </button>
+                                                <button type="button" data-action="delete-appendix-via-trigger" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-600 hover:bg-red-50">
+                                                    <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>Delete
+                                                </button>
+                                                <form method="post" asp-action="DeleteAppendixVIA" class="hidden">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@r.Id" />
+                                                    <input type="hidden" name="demandId" value="@Model.DemandId" />
+                                                </form>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-xs font-semibold text-slate-500">Frozen</span>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div id="viaEmptyState" class="@(Model.Records.Count == 0 ? "" : "hidden") px-6 py-14 text-center">
+            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                <i data-lucide="search-x" class="h-5 w-5"></i>
+            </div>
+            <h4 class="mt-3 text-sm font-bold text-slate-700">No records found</h4>
+            <p class="mt-1 text-xs text-slate-500">@(Model.Records.Count == 0 ? "No records to display yet." : "Try changing your filters or search criteria.")</p>
+            @if (Model.Records.Count > 0)
+            {
+                <button type="button" data-action="clear-appendix-via-filters" class="mt-4 rounded-lg bg-ubis-navy px-4 py-2 text-xs font-semibold text-white">Clear Filters</button>
+            }
+        </div>
+
+        <div class="flex flex-col justify-between gap-3 border-t border-slate-100 px-5 py-3 sm:flex-row sm:items-center">
+            <div class="text-[11px] text-slate-500">
+                Showing <span id="viaRangeText" class="font-semibold text-slate-700">@(Model.Records.Count == 0 ? "0" : "1–" + Model.Records.Count)</span> of <span id="viaTotalText" class="font-semibold text-slate-700">@Model.Records.Count</span> records
+            </div>
+            <div class="flex items-center gap-2">
+                <label class="hidden items-center gap-2 text-[11px] text-slate-500 sm:flex">
+                    Rows:
+                    <select id="viaPageSize" data-action="change-appendix-via-page-size" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                    </select>
+                </label>
+                <button id="viaPrevBtn" type="button" data-action="appendix-via-prev-page" class="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    <i data-lucide="chevron-left" class="h-3.5 w-3.5"></i> Previous
+                </button>
+                <div id="viaPageNumbers" class="flex items-center gap-1"></div>
+                <button id="viaNextBtn" type="button" data-action="appendix-via-next-page" class="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    Next <i data-lucide="chevron-right" class="h-3.5 w-3.5"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Drawer backdrop - deliberately no data-action="close-appendix-via-drawer" here (bug report
+         2026-09-07: "right side bar menu not close on clicking on form" - reproduced and confirmed:
+         the dimmed backdrop shows the page's own grid/filter content through it, and clicking that
+         visible-but-inert area was wired to dismiss the drawer, discarding whatever the user had
+         just typed. Only the header's X button and the footer's Cancel button close it now. -->
+    <div id="viaDrawerBackdrop" class="ubis-backdrop-hide fixed inset-0 z-[60] bg-slate-950/45 backdrop-blur-[2px] transition-opacity duration-300" aria-hidden="true"></div>
+
+    <!-- Right drawer - the REAL Add/Edit form (same asp-for bindings/POST action as before) -->
+    <aside id="viaDrawer" class="ubis-drawer-closed fixed right-0 top-0 z-[70] flex h-screen w-full max-w-[820px] flex-col border-l border-indigo-100 bg-white shadow-drawer transition-transform duration-300 ease-out" aria-label="User charge form" aria-hidden="true">
+        <div class="flex shrink-0 items-center justify-between border-b border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-cyan-50 px-5 py-4">
+            <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-ubis-tealLight text-ubis-teal">
+                    <i data-lucide="file-spreadsheet" class="h-5 w-5"></i>
+                </div>
+                <div>
+                    <h2 id="viaDrawerTitle" class="text-base font-bold text-ubis-navy">Add User Charge</h2>
+                    @* <p id="viaDrawerSubtitle" class="text-[11px] text-slate-500">Create a new user charge record</p> *@
+                    <div class="mt-1.5 flex flex-wrap items-center gap-2">
+                        <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-800">Demand No. @Model.DemandNo</span>
+                        <span class="text-[10px] font-semibold italic text-red-600">Amount in Crores of Rupees</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <form method="post" autocomplete="off" asp-action="SaveAppendixVIA" id="appendixVIAForm" data-demand-id="@Model.DemandId" data-autosave-key="PreBudget-AppendixVIA-@Model.DemandId" class="flex min-h-0 flex-1 flex-col">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="demandId" value="@Model.DemandId" />
+            <input type="hidden" name="code" value="VI-A" />
+            <input type="hidden" name="appendixId" value="@Model.AppendixId" />
+            <input type="hidden" asp-for="NewRecord.Id" />
+            <fieldset disabled="@locked" style="border:none;margin:0;padding:0;display:contents;">
+            <div class="min-h-0 flex-1 overflow-y-auto bg-slate-50/70 px-5 py-5">
+                @if (Model.IsNilSubmitted)
+                {
+                    <p class="mb-4 rounded-lg border border-teal-100 bg-ubis-tealLight px-3 py-2.5 text-sm text-slate-700">You have marked Nil Data for this Template, so data cannot be entered</p>
+                }
+                <section class="mb-4 rounded-xl border border-slate-200 bg-white">
+                    <div class="grid gap-4 p-4">
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Title of the User Charge <span class="text-red-500">*</span></label>
+                            <input class="form-field h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" maxlength="200" required asp-for="NewRecord.TitleOfCharge" />
+                        </div>
+                         <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Services for which the User Charge is levied <span class="text-red-500">*</span></label>
+                            <input class="form-field h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" maxlength="500" required asp-for="NewRecord.Service" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Organization/Dept. which is collecting this User Charge <span class="text-red-500">*</span></label>
+                            <input class="form-field h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" maxlength="250" required asp-for="NewRecord.OrgDept" />
+                        </div>                       
+                    </div>
+                    <div class="grid gap-4 p-4 md:grid-cols-1">
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Rate of User Charge and unit of collection <span class="text-red-500">*</span></label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="form-field tabular h-10 w-full rounded-lg border border-slate-300 pl-7 pr-3 text-right text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" maxlength="250" inputmode="decimal" placeholder="0.00" required asp-for="NewRecord.RateOfCharge" />
+                            </div>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Date of fixation of the rate of the current User Charge <span class="text-red-500">*</span></label>
+                            <input class="form-field h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="date" max="@DateTime.Today.ToString("yyyy-MM-dd")" title="Cannot be a future date" required asp-for="NewRecord.DateOfRateFixation" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Fixation Done under which statute/rule/Act/order/OM <span class="text-red-500">*</span></label>
+                            <input class="form-field h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" maxlength="250" required asp-for="NewRecord.FixationStatute" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Competent Authority to re-fix the User Charge</label>
+                            <input class="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" maxlength="250" asp-for="NewRecord.CompetentAuthority" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Period of re-fixation of User Charge, if any</label>
+                            <input class="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" placeholder="Example: Every 3 years" maxlength="250" asp-for="NewRecord.PeriodOfFixation" />
+                        </div>
+                    </div>
+
+                    <div class="grid pt-4 pl-3 md:grid-cols-1">
+                        <h3 class="text-sm font-bold text-slate-800">Total Revenue from User Charges</h3>
+                    </div>
+                    <div class="grid gap-3 p-4 md:grid-cols-3">
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">@y1 <span class="text-red-500">*</span></p>
+                            <div class="relative mt-2">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.TotalRevenueY1" />
+                            </div>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">@y2 <span class="text-red-500">*</span></p>
+                            <div class="relative mt-2">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.TotalRevenueY2" />
+                            </div>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">@y3 <span class="text-red-500">*</span></p>
+                            <div class="relative mt-2">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-800 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.TotalRevenueY3" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid pt-4 pl-3 md:grid-cols-1">
+                        <h3 class="text-sm font-bold text-slate-800">Cost of delivering that particular service (if available)</h3>
+                    </div>
+                    <div class="grid gap-4 p-4">
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Salary and Emoluments of staff involved in particular service <span class="text-red-500">*</span></label>
+                            <input class="form-field h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.Salary" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Office Expenses (OE) of the relevant office for delivering particular service <span class="text-red-500">*</span></label>
+                            <input class="form-field h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.OfficeExpenses" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Other Expenses for delivering the particular service <span class="text-red-500">*</span></label>
+                            <input class="form-field h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.OtherExpenses" />
+                        </div>
+                    </div>
+
+                    <div class="space-y-4 p-4">
+                        <div>
+                            <p class="mb-2 text-xs font-semibold leading-5 text-slate-700">Whether the cost of collection is higher than Revenue earned?</p>
+                            <div class="flex gap-2">
+                                <button type="button" data-group="q1" data-target="viaIsCollectionCostHigherYes" class="seg-btn @(Model.NewRecord.IsCollectionCostHigher ? "seg-active" : "border-slate-300 text-slate-600") rounded-lg border px-5 py-2 text-xs font-semibold hover:bg-slate-50">YES</button>
+                                <button type="button" data-group="q1" data-target="viaIsCollectionCostHigherNo" class="seg-btn @(!Model.NewRecord.IsCollectionCostHigher ? "seg-active" : "border-slate-300 text-slate-600") rounded-lg border px-5 py-2 text-xs font-semibold hover:bg-slate-50">NO</button>
+                                <input type="radio" id="viaIsCollectionCostHigherYes" class="hidden" name="NewRecord.IsCollectionCostHigher" value="true" checked="@(Model.NewRecord.IsCollectionCostHigher ? "checked" : null)" />
+                                <input type="radio" id="viaIsCollectionCostHigherNo" class="hidden" name="NewRecord.IsCollectionCostHigher" value="false" checked="@(!Model.NewRecord.IsCollectionCostHigher ? "checked" : null)" />
+                            </div>
+                        </div>
+                        <div class="border-t border-slate-100 pt-4">
+                            <p class="mb-2 text-xs font-semibold leading-5 text-slate-700">Whether the transaction cost for the user is higher than the rate of User Charge i.e., whether the rate of user charge is less than the cost of DD/RTGS etc. </p>
+                            <div class="flex gap-2">
+                                <button type="button" data-group="q2" data-target="viaIsTransCostHigherYes" class="seg-btn @(Model.NewRecord.IsTransCostHigher ? "seg-active" : "border-slate-300 text-slate-600") rounded-lg border px-5 py-2 text-xs font-semibold hover:bg-slate-50">YES</button>
+                                <button type="button" data-group="q2" data-target="viaIsTransCostHigherNo" class="seg-btn @(!Model.NewRecord.IsTransCostHigher ? "seg-active" : "border-slate-300 text-slate-600") rounded-lg border px-5 py-2 text-xs font-semibold hover:bg-slate-50">NO</button>
+                                <input type="radio" id="viaIsTransCostHigherYes" class="hidden" name="NewRecord.IsTransCostHigher" value="true" checked="@(Model.NewRecord.IsTransCostHigher ? "checked" : null)" />
+                                <input type="radio" id="viaIsTransCostHigherNo" class="hidden" name="NewRecord.IsTransCostHigher" value="false" checked="@(!Model.NewRecord.IsTransCostHigher ? "checked" : null)" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-4">
+                        <label class="mb-1.5 block text-xs font-semibold text-slate-700">Remarks <span class="text-red-500">*</span></label>
+                        <textarea id="NewRecord_Remarks" name="NewRecord.Remarks" maxlength="500" rows="4" placeholder="Enter remarks..." required
+                                  class="RemarksText w-full resize-none rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-ubis-teal focus:ring-4 focus:ring-teal-50">@Model.NewRecord.Remarks</textarea>
+                        <div class="mt-1.5 text-right text-[10px] text-slate-400"><span id="viaCharCount">@(Model.NewRecord.Remarks?.Length ?? 0)</span> / 500</div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="flex shrink-0 items-center justify-end border-t border-slate-200 bg-white px-5 py-3.5">
+                <div class="flex items-center gap-2">
+                    <button type="reset" class="h-9 rounded-lg border border-ubis-navy px-3.5 text-xs font-semibold text-ubis-navy hover:bg-blue-50">Clear</button>
+                    <button type="button" data-action="close-appendix-via-drawer" class="h-9 rounded-lg border border-slate-300 px-3.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                    <button type="submit" class="h-9 rounded-lg bg-ubis-teal px-4 text-xs font-bold text-white shadow-sm hover:bg-teal-700">Save Record</button>
+                    <button type="button" class="hidden" data-action="cancel-edit"></button>
+                </div>
+            </div>
+            </fieldset>
+        </form>
+    </aside>
+
+    <!-- Toast -->
+    @* No role="status" here on purpose (bug report 2026-09-03: "Record Saved Successfully" dialog
+       firing on page load, nothing was saved) - pre-budget-meeting.js's showStatusMessageAsDialog
+       does root.querySelector('[role="status"]') to find the server's real <p role="status">
+       StatusMessage banner above. On a normal load Model.StatusMessage is empty, so that <p>
+       never renders (the @if around it is false) - the query then fell through to match THIS
+       toast (always present in the DOM, just visually hidden) and read its static placeholder
+       text as if it were a real save confirmation. aria-live/aria-atomic alone are what actually
+       drive screen-reader announcements for a toast; role="status" only mattered here for that
+       unrelated dialog's DOM lookup. *@
+    <div id="viaToast" class="ubis-toast-hide ubis-toast-success fixed bottom-5 right-5 z-[100] flex w-[calc(100%-2rem)] max-w-sm items-start gap-3 rounded-xl border bg-white p-4 shadow-2xl transition-all duration-300" aria-live="polite" aria-atomic="true">
+        <div class="ubis-toast-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-full">
+            <i id="viaToastIcon" data-lucide="check-circle-2" class="h-4 w-4"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+            <p id="viaToastTitle" class="text-xs font-bold text-slate-800">Success</p>
+            <p id="viaToastMessage" class="mt-0.5 text-[11px] text-slate-500"></p>
+        </div>
+        <button id="viaToastClose" type="button" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-4 focus:ring-slate-100" aria-label="Close notification"><i data-lucide="x" class="h-4 w-4"></i></button>
+    </div>
+
+    <!-- Delete confirmation dialog -->
+    <div id="viaDeleteDialog" class="ubis-dialog-hide fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px] transition-opacity duration-200" role="dialog" aria-modal="true" aria-labelledby="viaDeleteDialogTitle" aria-hidden="true">
+        <div class="ubis-dialog-card w-full max-w-md rounded-2xl border border-red-100 bg-white p-5 shadow-2xl transition-all duration-200">
+            <div class="flex items-start gap-4">
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                    <i data-lucide="trash-2" class="h-5 w-5"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <h2 id="viaDeleteDialogTitle" class="text-base font-bold text-slate-900">Delete</h2>
+                    <p class="mt-1 text-sm leading-5 text-slate-500">Are you sure you want to delete?</p>
+                    <p id="viaDeleteRecordName" class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800"></p>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end gap-2">
+                <button id="viaCancelDeleteBtn" type="button" class="h-10 rounded-lg border border-slate-300 px-4 text-xs font-bold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100">Cancel</button>
+                <button id="viaConfirmDeleteBtn" type="button" class="inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-100"><i data-lucide="trash-2" class="h-4 w-4"></i>Delete record</button>
+            </div>
+        </div>
+    </div>
+</div>

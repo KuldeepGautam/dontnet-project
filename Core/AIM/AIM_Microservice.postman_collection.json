@@ -1,0 +1,334 @@
+{
+  "info": {
+    "_postman_id": "aim-microservice-collection",
+    "name": "AIM Microservice",
+    "description": "Authentication & Identity Management Microservice - Complete API Test Collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var jsonData = pm.response.json();",
+              "    pm.environment.set(\"token\", jsonData.token);",
+              "    pm.environment.set(\"sessionId\", jsonData.sessionId);",
+              "    console.log(\"✓ Login successful\");",
+              "    console.log(\"Token: \" + jsonData.token.substring(0, 50) + \"...\");",
+              "    console.log(\"Session ID: \" + jsonData.sessionId);",
+              "} else {",
+              "    console.log(\"✗ Login failed: \" + pm.response.code);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"userName\": \"{{username}}\", \"password\": \"{{password}}\", \"financialYear\": \"{{financialYear}}\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/authentication/login",
+          "host": ["{{base_url}}"],
+          "path": ["authentication", "login"]
+        }
+      }
+    },
+    {
+      "name": "2. Get My Role",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var jsonData = pm.response.json();",
+              "    pm.environment.set(\"userRole\", jsonData.role.roleCode);",
+              "    console.log(\"✓ User role: \" + jsonData.role.roleName);",
+              "    console.log(\"✓ Permissions: \" + jsonData.functionPermissions.length + \" functions\");",
+              "} else {",
+              "    console.log(\"✗ Failed to get role: \" + pm.response.code);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/userrole/my-role?financialYear={{financialYear}}",
+          "host": ["{{base_url}}"],
+          "path": ["userrole", "my-role"],
+          "query": [
+            {
+              "key": "financialYear",
+              "value": "{{financialYear}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "3. Check Permission",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/userrole/check-permission?functionCode=USER_MANAGEMENT&permission=CREATE&financialYear={{financialYear}}",
+          "host": ["{{base_url}}"],
+          "path": ["userrole", "check-permission"],
+          "query": [
+            {
+              "key": "functionCode",
+              "value": "USER_MANAGEMENT"
+            },
+            {
+              "key": "permission",
+              "value": "CREATE"
+            },
+            {
+              "key": "financialYear",
+              "value": "{{financialYear}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "4. Change Password",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"currentPassword\": \"{{password}}\", \"newPassword\": \"NewSecurePassword456!\", \"confirmNewPassword\": \"NewSecurePassword456!\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/authentication/change-password",
+          "host": ["{{base_url}}"],
+          "path": ["authentication", "change-password"]
+        }
+      }
+    },
+    {
+      "name": "5. Forgot Password",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var jsonData = pm.response.json();",
+              "    pm.environment.set(\"resetToken\", jsonData.resetToken);",
+              "    console.log(\"✓ Reset token generated\");",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\": \"admin@ubis.gov\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/authentication/forgot-password",
+          "host": ["{{base_url}}"],
+          "path": ["authentication", "forgot-password"]
+        }
+      }
+    },
+    {
+      "name": "6. Reset Password",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"resetToken\": \"{{resetToken}}\", \"newPassword\": \"AnotherPassword789!\", \"confirmNewPassword\": \"AnotherPassword789!\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/authentication/reset-password",
+          "host": ["{{base_url}}"],
+          "path": ["authentication", "reset-password"]
+        }
+      }
+    },
+    {
+      "name": "7. Logout",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/authentication/logout?sessionId={{sessionId}}",
+          "host": ["{{base_url}}"],
+          "path": ["authentication", "logout"],
+          "query": [
+            {
+              "key": "sessionId",
+              "value": "{{sessionId}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "8. List All Roles",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var jsonData = pm.response.json();",
+              "    pm.environment.set(\"roleId\", jsonData.data[0].roleId);",
+              "    console.log(\"✓ Roles retrieved: \" + jsonData.data.length);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/userrole/all-roles",
+          "host": ["{{base_url}}"],
+          "path": ["userrole", "all-roles"]
+        }
+      }
+    },
+    {
+      "name": "9. Get Role Functions",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/userrole/roles/{{roleId}}/functions",
+          "host": ["{{base_url}}"],
+          "path": ["userrole", "roles", "{{roleId}}", "functions"]
+        }
+      }
+    },
+    {
+      "name": "ERROR: Invalid Credentials",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"userName\": \"admin\", \"password\": \"WrongPassword\", \"financialYear\": \"{{financialYear}}\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/authentication/login",
+          "host": ["{{base_url}}"],
+          "path": ["authentication", "login"]
+        }
+      }
+    },
+    {
+      "name": "ERROR: Invalid Token",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer invalid_token_12345"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/userrole/my-role?financialYear={{financialYear}}",
+          "host": ["{{base_url}}"],
+          "path": ["userrole", "my-role"],
+          "query": [
+            {
+              "key": "financialYear",
+              "value": "{{financialYear}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "ERROR: Missing Authorization Header",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/userrole/my-role?financialYear={{financialYear}}",
+          "host": ["{{base_url}}"],
+          "path": ["userrole", "my-role"],
+          "query": [
+            {
+              "key": "financialYear",
+              "value": "{{financialYear}}"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

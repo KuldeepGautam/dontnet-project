@@ -1,0 +1,485 @@
+@model UBIS.Web.Areas.PreBudgetMeeting.Models.AppendixIAViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Appendix I-A - Projected Demand by Ministry/Department (on Net Basis)";
+    var locked = Model.IsEntryLocked;
+
+    // "Approved design for all appendixes" (extended 2026-09-08 to the remaining PreBudget
+    // appendixes beyond VI-A..E) - same drawer/grid theme reused verbatim (see
+    // ubis2_appendix_redesign_reuse_shared_files memory). Year is a row (prior FY, then the
+    // current/proposed FY), not a column - Revenue/Capital/Total each split BE|RE, Total is a
+    // server-computed value (AppendixProjectedDemandDto.TotalBE/PrevYrTotalBE/PrevYrTotalRE, per
+    // the "server-computed totals belong in the entity/EF layer" convention) mirrored live client-
+    // side while typing via the existing, unchanged recalcAppendixIATotals. MTEF Revenue/Capital BE
+    // only ever apply to the proposed year and stay hidden inputs (client testing feedback,
+    // 2026-08-24 - kept so an existing saved value isn't silently wiped to null on Submit).
+}
+
+<div class="ubis-modern-appendix">
+    <section class="appendix-highlight mb-5 rounded-2xl border p-4">
+        <div class="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
+            <div class="flex items-start gap-3">
+                <div class="hero-icon-large">
+                    <i data-lucide="file-spreadsheet" class="h-6 w-6"></i>
+                </div>
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-2xl font-extrabold tracking-tight text-indigo-950">Appendix I-A</h2>
+                        @* <span id="iaRecordCountBadge" class="rounded-full bg-white px-3 py-1 text-[10px] font-bold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200">@Model.Records.Count Record@(Model.Records.Count == 1 ? "" : "s")</span> *@
+                        @if (Model.IsAppendixFrozen)
+                        {
+                            <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                                <span class="freezedot"></span>Freezed
+                            </span>
+                        }
+                        else if (Model.IsNilSubmitted)
+                        {
+                            <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                                <span class="freezedot"></span>NIL
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                                <span class="bluedot"></span>In Progress
+                            </span>
+                        }
+                    </div>
+                    <p class="mt-1.5 text-sm font-medium text-slate-600">Projected Demand by Ministry/Department (on Net Basis)</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                @* Client requirement (AppendixIAController.cs's own comment: "second entry is
+                   prohibited") - Appendix I-A only ever permits ONE record per Demand+FinancialYear,
+                   same as Appendix II - see ubis2_appendix_redesign_business_rules_checklist memory.
+                   Add is hidden once that one record exists; Edit (via the grid row's action menu)
+                   is the only way in from then on. *@
+                @if (Model.Records.Count == 0 && !locked)
+                {
+                    <button type="submit" form="appendixIAForm" formnovalidate formaction="@Url.Action("SetNilSubmission")"
+                            class="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100">
+                        Nil
+                    </button>
+                }
+                @if (Model.Records.Count > 0 && !locked)
+                {
+                    <button type="submit" form="appendixIAForm" formnovalidate formaction="@Url.Action("FreezeAppendixTemplate")"
+                            class="inline-flex h-10 items-center justify-center rounded-lg bg-orange-100 px-4 text-sm font-semibold freeze-button shadow-sm transition hover:bg-orange-200 focus:outline-none focus:ring-4 focus:ring-orange-100">
+                        Freeze Data
+                    </button>
+                }
+                @if (Model.Records.Count == 0 && !locked)
+                {
+                    <button type="button" data-action="open-appendix-ia-add-drawer"
+                            class="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-ubis-navy px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-ubis-dark focus:outline-none focus:ring-4 focus:ring-blue-100">
+                        <i data-lucide="plus" class="h-4 w-4"></i>Add
+                    </button>
+                }
+            </div>
+        </div>
+    </section>
+
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="mb-4">
+            <p class="text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="status">@Model.StatusMessage</p>
+        </div>
+    }
+
+  
+
+    <!-- Data Grid -->
+    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
+        <div class="flex flex-col justify-between gap-3 border-b border-slate-100 px-5 py-3.5 sm:flex-row sm:items-center">
+            <div class="positioned-context">
+                <i data-lucide="search" class="absolute left-3 top-3 h-4 w-8 text-slate-400"></i>
+                <input id="iaSearchInput" type="search" placeholder="Search" class="search-control">
+            </div>
+
+            <div class="flex items-center gap-2">
+
+                <div class="relative">
+                    <button id="iaColumnsButton" type="button"
+                            class="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="iaColumnsMenu">
+                        <i data-lucide="columns-3" class="h-3.5 w-3.5"></i> Columns
+                    </button>
+                    <div id="iaColumnsMenu" class="absolute right-0 top-10 z-30 hidden w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl" role="menu" aria-label="Choose visible columns">
+                        <div class="border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-cyan-50 px-4 py-3">
+                            <p class="text-xs font-bold text-slate-800">Visible columns</p>
+                            <p class="mt-0.5 text-[10px] text-slate-500">Choose the information shown in the table.</p>
+                        </div>
+                        <div class="space-y-1 p-2">
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="revbe" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Revenue BE</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="revre" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Revenue RE</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="capbe" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Capital BE</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="capre" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Capital RE</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="totbe" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Total BE</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="totre" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Total RE</label>
+                        </div>
+                        <div class="border-t border-slate-100 bg-slate-50 px-3 py-2.5">
+                            <button type="button" data-action="reset-appendix-ia-columns" class="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50"><i data-lucide="rotate-ccw" class="h-3.5 w-3.5"></i>Reset columns</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="relative">
+                    <button id="iaExportButton" type="button" data-action="toggle-appendix-ia-export-menu"
+                            class="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="iaExportMenu">
+                        <i data-lucide="download" class="h-3.5 w-3.5"></i> Export
+                        <i data-lucide="chevron-down" class="h-3 w-3 text-slate-400"></i>
+                    </button>
+                    <div id="iaExportMenu" class="absolute right-0 top-10 z-30 hidden w-44 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-2xl">
+                        <button type="button" data-action="export-appendix-ia" data-format="pdf"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-rose-600">
+                            <i data-lucide="file-text" class="h-4 w-4 text-rose-500"></i>
+                            <span>PDF</span>
+                        </button>
+                        <button type="button" data-action="export-appendix-ia" data-format="excel"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-emerald-600">
+                            <i data-lucide="sheet" class="h-4 w-4 text-emerald-600"></i>
+                            <span>Excel</span>
+                        </button>
+                        <button type="button" data-action="export-appendix-ia" data-format="csv"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-blue-600">
+                            <i data-lucide="file-spreadsheet" class="h-4 w-4 text-blue-500"></i>
+                            <span>CSV</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="iaGridScroll" class="grid-scroll">
+            <span class="amtmsg">Amount in Crores of Rupees</span>
+            <table id="chargesTable" class="ubis-data-grid">                
+                <thead class="ubis-data-grid__head ubis-data-grid__head--plain">
+                    <tr class="data-grid__header-row">
+                        <th rowspan="2" width="18%">Year</th>
+                        <th colspan="2" class="grid-head-cell grid-head-cell--compact items-center">
+                           Revenue
+                        </th>
+                        <th colspan="2" class="grid-head-cell grid-head-cell--compact items-center">
+                          Capital
+                        </th>
+                        <th colspan="2" class="grid-head-cell grid-head-cell--compact items-center">
+                          Total
+                        </th>
+                        @if (!locked)
+                        {
+                            <th rowspan="2" class="text-center" width="8%">Action</th>
+                        }
+                    </tr>
+                     <tr class="data-grid__header-row">
+                        <th data-column="revbe" class="grid-head-cell grid-head-cell--compact">BE</th>
+                        <th data-column="revre" class="grid-head-cell grid-head-cell--compact">RE </th>
+                        <th data-column="capbe" class="grid-head-cell grid-head-cell--compact">BE</th>
+                        <th data-column="capre" class="grid-head-cell grid-head-cell--compact">RE</th>
+                        <th data-column="totbe" class="grid-head-cell grid-head-cell--compact">BE</th>
+                        <th data-column="totre" class="grid-head-cell grid-head-cell--compact">RE</th>
+                    </tr>
+                </thead>
+                <tbody id="gridBody" class="divide-y divide-slate-100">
+                    @for (var i = 0; i < Model.Records.Count; i++)
+                    {
+                        var r = Model.Records[i];
+                        var status = r.IsFrozen ? "Frozen" : "Active";
+                        // Client requirement 2026-09-18: Appendix I-A search must match every visible
+                        // grid column, including the numeric BE/RE/Total figures - unlike the general
+                        // text-only search rule (see ubis2_grid_sort_search_text_columns_only memory),
+                        // this grid has no name/code text column at all besides Year, so restricting
+                        // search to text would make it useless here.
+                        // Client requirement 2026-09-18: the two rows of a record must filter
+                        // independently (search "46" shows only the row that actually has "46" in
+                        // it) - each row carries its own data-row/data-search built only from its
+                        // own visible values. The Action column itself stays a single rowspan="2"
+                        // cell anchored on the prior-year row (one record = one menu) per a later
+                        // 2026-09-18 client correction - this means the Action cell can visually
+                        // misalign if a search matches only the proposed-year row, which was an
+                        // accepted tradeoff when reverting the earlier per-row Action cells.
+                        var prevYearHaystack = string.Join(" ", new[]
+                        {
+                            r.Id.ToString(), status,
+                            Model.PriorFinancialYear,
+                            r.PrevYrMinRevenueBE?.ToString("0.00") ?? "0.00",
+                            r.PrevYrMinRevenueRE?.ToString("0.00") ?? "0.00",
+                            r.PrevYrMinCapitalBE?.ToString("0.00") ?? "0.00",
+                            r.PrevYrMinCapitalRE?.ToString("0.00") ?? "0.00",
+                            r.PrevYrTotalBE.ToString("0.00"),
+                            r.PrevYrTotalRE.ToString("0.00")
+                        });
+                        var currYearHaystack = string.Join(" ", new[]
+                        {
+                            r.Id.ToString(), status,
+                            $"{Model.FinancialYear} (Proposed by Ministry)",
+                            r.CurrYrMinRevenueBE?.ToString("0.00") ?? "0.00",
+                            r.CurrYrMinCapitalBE?.ToString("0.00") ?? "0.00",
+                            r.TotalBE.ToString("0.00")
+                        });
+                        <tr data-row data-status="@status" data-search="@prevYearHaystack"
+                            data-sort-revbe="@r.PrevYrMinRevenueBE" data-sort-revre="@r.PrevYrMinRevenueRE"
+                            data-sort-capbe="@r.PrevYrMinCapitalBE" data-sort-capre="@r.PrevYrMinCapitalRE"
+                            data-sort-totbe="@r.PrevYrTotalBE" data-sort-totre="@r.PrevYrTotalRE"
+                            class="group border-b border-slate-100 transition odd:bg-white even:bg-slate-50/60 hover:bg-cyan-50/60 @(r.IsFrozen ? "bg-slate-50" : "")">
+                            <td class="px-2 py-3 text-xs font-semibold text-slate-600">@Model.PriorFinancialYear</td>
+                            <td data-column="revbe" class="tabular px-2 py-3 text-right">@(r.PrevYrMinRevenueBE?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="revre" class="tabular px-2 py-3 text-right">@(r.PrevYrMinRevenueRE?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="capbe" class="tabular px-2 py-3 text-right">@(r.PrevYrMinCapitalBE?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="capre" class="tabular px-2 py-3 text-right">@(r.PrevYrMinCapitalRE?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="totbe" class="tabular px-2 py-3 text-right text-xs font-bold text-slate-800">@r.PrevYrTotalBE.ToString("0.00")</td>
+                            <td data-column="totre" class="tabular px-2 py-3 text-right text-xs font-bold text-slate-800">@r.PrevYrTotalRE.ToString("0.00")</td>
+                            @if (!locked)
+                            {
+                                <td class="grid-action-cell px-2 py-3 text-center" rowspan="2">
+                                    @if (!r.IsFrozen)
+                                    {
+                                        <div class="relative inline-block">
+                                            <button type="button" class="row-menu-btn inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                                                    data-action-id="@r.Id" aria-label="Actions for record @(i + 1)" aria-haspopup="true">
+                                                <i data-lucide="more-horizontal" class="h-4 w-4"></i>
+                                            </button>
+                                            <div id="ia-menu-@r.Id" class="action-menu absolute right-0 top-9 z-20 hidden w-40 rounded-xl border border-slate-200 bg-white p-1.5 text-left shadow-xl">
+                                                <button type="button" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
+                                                        data-action="edit-appendix-ia-row"
+                                                        data-id="@r.Id"
+                                                        data-prev-yr-min-revenue-be="@r.PrevYrMinRevenueBE"
+                                                        data-prev-yr-min-revenue-re="@r.PrevYrMinRevenueRE"
+                                                        data-prev-yr-min-capital-be="@r.PrevYrMinCapitalBE"
+                                                        data-prev-yr-min-capital-re="@r.PrevYrMinCapitalRE"
+                                                        data-curr-yr-min-revenue-be="@r.CurrYrMinRevenueBE"
+                                                        data-curr-yr-min-capital-be="@r.CurrYrMinCapitalBE"
+                                                        data-curr-yr-min-mtef-revenue-be="@r.CurrYrMinMtefRevenueBE"
+                                                        data-curr-yr-min-mtef-capital-be="@r.CurrYrMinMtefCapitalBE">
+                                                    <i data-lucide="pencil" class="h-3.5 w-3.5"></i>Edit
+                                                </button>
+                                                <button type="button" data-action="delete-appendix-ia-trigger" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-600 hover:bg-red-50">
+                                                    <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>Delete
+                                                </button>
+                                                <form method="post" asp-action="DeleteAppendixIA" class="hidden">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@r.Id" />
+                                                    <input type="hidden" name="demandId" value="@Model.DemandId" />
+                                                </form>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-xs font-semibold text-slate-500">Frozen</span>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                        <tr data-row data-status="@status" data-search="@currYearHaystack" class="odd:bg-white even:bg-slate-50/60">
+                            <td class="px-2 py-3 text-xs font-semibold text-slate-600">@Model.FinancialYear (Proposed by Ministry)</td>
+                            <td data-column="revbe" class="tabular px-2 py-3 text-right text-xs font-bold text-indigo-800">@(r.CurrYrMinRevenueBE?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="revre" class="tabular px-2 py-3 text-center text-xs text-slate-400 bg-slate-100"></td>
+                            <td data-column="capbe" class="tabular px-2 py-3 text-right text-xs font-bold text-indigo-800">@(r.CurrYrMinCapitalBE?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="capre" class="tabular px-2 py-3 text-center text-xs text-slate-400 bg-slate-100"></td>
+                            <td data-column="totbe" class="tabular px-2 py-3 text-right text-xs font-bold text-indigo-800">@r.TotalBE.ToString("0.00")</td>
+                            <td data-column="totre" class="tabular px-2 py-3 text-center text-xs text-slate-400 bg-slate-100"></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div id="iaEmptyState" class="@(Model.Records.Count == 0 ? "" : "hidden") px-6 py-14 text-center">
+            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                <i data-lucide="search-x" class="h-5 w-5"></i>
+            </div>
+            <h4 class="mt-3 text-sm font-bold text-slate-700">No records found</h4>
+            <p class="mt-1 text-xs text-slate-500">@(Model.Records.Count == 0 ? "No records to display yet." : "Try changing your filters or search criteria.")</p>
+            @if (Model.Records.Count > 0)
+            {
+                <button type="button" data-action="clear-appendix-ia-filters" class="mt-4 rounded-lg bg-ubis-navy px-4 py-2 text-xs font-semibold text-white">Clear Filters</button>
+            }
+        </div>
+
+        <div class="flex flex-col justify-between gap-3 border-t border-slate-100 px-5 py-3 sm:flex-row sm:items-center">
+            <div class="text-[11px] text-slate-500">
+                Showing <span id="iaRangeText" class="font-semibold text-slate-700">@(Model.Records.Count == 0 ? "0" : "1–" + Model.Records.Count)</span> of <span id="iaTotalText" class="font-semibold text-slate-700">@Model.Records.Count</span> records
+            </div>
+            <div class="flex items-center gap-2">
+                <label class="hidden items-center gap-2 text-[11px] text-slate-500 sm:flex">
+                    Rows:
+                    <select id="iaPageSize" data-action="change-appendix-ia-page-size" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                    </select>
+                </label>
+                <button id="iaPrevBtn" type="button" data-action="appendix-ia-prev-page" class="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    <i data-lucide="chevron-left" class="h-3.5 w-3.5"></i> Previous
+                </button>
+                <div id="iaPageNumbers" class="flex items-center gap-1"></div>
+                <button id="iaNextBtn" type="button" data-action="appendix-ia-next-page" class="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    Next <i data-lucide="chevron-right" class="h-3.5 w-3.5"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Drawer backdrop - no data-action="close-appendix-ia-drawer" here, same fix already
+         proven for VI-A. Only the header's X button and the footer's Cancel button close it. -->
+    <div id="iaDrawerBackdrop" class="ubis-backdrop-hide fixed inset-0 z-[60] bg-slate-950/45 backdrop-blur-[2px] transition-opacity duration-300" aria-hidden="true"></div>
+
+    <!-- Right drawer - the REAL Add/Edit form (same asp-for bindings/POST action as before) -->
+    <aside id="iaDrawer" class="ubis-drawer-closed fixed right-0 top-0 z-[70] flex h-screen w-full max-w-[820px] flex-col border-l border-indigo-100 bg-white shadow-drawer transition-transform duration-300 ease-out" aria-label="Projected Demand form" aria-hidden="true">
+        <div class="flex shrink-0 items-center justify-between border-b border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-cyan-50 px-5 py-4">
+            <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-ubis-tealLight text-ubis-teal">
+                    <i data-lucide="file-spreadsheet" class="h-5 w-5"></i>
+                </div>
+                <div>
+                    <h2 id="iaDrawerTitle" class="text-base font-bold text-ubis-navy">Add Projected Demand</h2>
+                    @* <p id="iaDrawerSubtitle" class="text-[11px] text-slate-500">Create a new record</p> *@
+                    <div class="mt-1.5 flex flex-wrap items-center gap-2">
+                        <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-800">Demand No. @Model.DemandNo</span>
+                        <span class="text-[10px] font-semibold italic text-red-600">Amount in Crores of Rupees</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <form method="post" autocomplete="off" asp-action="SaveAppendixIA" id="appendixIAForm" data-demand-id="@Model.DemandId" data-autosave-key="PreBudget-AppendixIA-@Model.DemandId" class="flex min-h-0 flex-1 flex-col">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="demandId" value="@Model.DemandId" />
+            <input type="hidden" name="code" value="I-A" />
+            <input type="hidden" name="appendixId" value="@Model.AppendixId" />
+            <input type="hidden" asp-for="NewRecord.Id" />
+            <fieldset disabled="@locked" style="border:none;margin:0;padding:0;display:contents;">
+                <div class="min-h-0 flex-1 overflow-y-auto bg-slate-50/70 px-5 py-5">
+                    @if (Model.IsNilSubmitted)
+                    {
+                        <p class="mb-4 rounded-lg border border-teal-100 bg-ubis-tealLight px-3 py-2.5 text-sm text-slate-700">You have marked Nil Data for this Template, so data cannot be entered</p>
+                    }
+                    <section class="mb-4 rounded-xl border border-slate-200 bg-white">
+                        <div class="grid pt-4 pl-3 md:grid-cols-1">
+                            <h3 class="text-sm font-bold text-slate-800">@Model.PriorFinancialYear</h3>
+                        </div>
+                        <div class="grid gap-3 p-4 md:grid-cols-3">
+                            <div>
+                                <p class="text-[10px] font-bold  tracking-wide text-slate-500">Revenue BE  </p>
+                                <div class="relative mt-2">
+                                    <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                    <input class="NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-slate-100 pl-7 pr-3 text-right text-sm font-semibold text-slate-700 outline-none" type="number" step="0.01" min="0" required asp-for="NewRecord.PrevYrMinRevenueBE" />
+                                </div>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold  tracking-wide text-slate-500">Capital BE </p>
+                                <div class="relative mt-2">
+                                    <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                    <input class="NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-slate-100 pl-7 pr-3 text-right text-sm font-semibold text-slate-700 outline-none" type="number" step="0.01" min="0" required asp-for="NewRecord.PrevYrMinCapitalBE" />
+                                </div>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold  tracking-wide text-slate-500">Total BE</p>
+                                <div class="relative mt-2">
+                                    <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                    <input id="appendixIAPrevTotalBE" class="NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-slate-100 pl-7 pr-3 text-right text-sm font-semibold text-slate-700 outline-none" type="text" readonly tabindex="-1" />
+                                </div>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold  tracking-wide text-slate-500">Revenue RE <span class="text-red-500">*</span></p>
+                                <div class="relative mt-2">
+                                    <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                    <input class="NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.PrevYrMinRevenueRE" />
+                                </div>
+                            </div>
+
+                            <div>
+                                <p class="text-[10px] font-bold  tracking-wide text-slate-500">Capital RE <span class="text-red-500">*</span></p>
+                                <div class="relative mt-2">
+                                    <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                    <input class="NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.PrevYrMinCapitalRE" />
+                                </div>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold  tracking-wide text-slate-500">Total RE</p>
+                                <div class="relative mt-2">
+                                    <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                    <input id="appendixIAPrevTotalRE" class="NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-slate-100 pl-7 pr-3 text-right text-sm font-semibold text-slate-700 outline-none" type="text" readonly tabindex="-1" />
+                                </div>
+                            </div>
+                        </div>
+
+                    </section>
+
+                    <section class="mb-4 rounded-xl border border-slate-200 bg-white">
+                        <div class="grid pt-4 pl-3 md:grid-cols-1">
+                            <h3 class="text-sm font-bold text-slate-800">@Model.FinancialYear (Proposed by Ministry)</h3>
+                        </div>
+                        <div class="grid gap-3 p-4 md:grid-cols-3">
+                            <div>
+                                <p class="text-[10px] font-bold  tracking-wide text-slate-500">Revenue BE <span class="text-red-500">*</span></p>
+                                <div class="relative mt-2">
+                                    <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                    <input class="NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-800 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.CurrYrMinRevenueBE" />
+                                </div>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold  tracking-wide text-slate-500">Capital BE <span class="text-red-500">*</span></p>
+                                <div class="relative mt-2">
+                                    <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                    <input class="NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-800 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.CurrYrMinCapitalBE" />
+                                </div>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold  tracking-wide text-slate-500">Total BE</p>
+                                <div class="relative mt-2">
+                                    <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                    <input id="appendixIACurrTotalBE" class="NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-slate-100 pl-7 pr-3 text-right text-sm font-semibold text-slate-700 outline-none" type="text" readonly tabindex="-1" />
+                                </div>
+                            </div>
+                        </div>
+
+                        @* MTEF removed from the UI (client testing feedback, 2026-08-24) - kept as hidden
+                       inputs so an existing saved value isn't silently wiped to null on Submit. *@
+                        <input type="hidden" asp-for="NewRecord.CurrYrMinMtefRevenueBE" />
+                        <input type="hidden" asp-for="NewRecord.CurrYrMinMtefCapitalBE" />
+                    </section>
+                </div>
+
+                <div class="flex shrink-0 items-center justify-end border-t border-slate-200 bg-white px-5 py-3.5">
+                    <div class="flex items-center gap-2">
+                        <button type="reset" class="h-9 rounded-lg border border-ubis-navy px-3.5 text-xs font-semibold text-ubis-navy hover:bg-blue-50">Clear</button>
+                        <button type="button" data-action="close-appendix-ia-drawer" class="h-9 rounded-lg border border-slate-300 px-3.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>                        
+                        <button type="submit" class="h-9 rounded-lg bg-ubis-teal px-4 text-xs font-bold text-white shadow-sm hover:bg-teal-700">Save Record</button>
+                    </div>
+                </div>
+            </fieldset>
+        </form>
+    </aside>
+
+    <!-- Toast -->
+    <div id="iaToast" class="ubis-toast-hide ubis-toast-success fixed bottom-5 right-5 z-[100] flex w-[calc(100%-2rem)] max-w-sm items-start gap-3 rounded-xl border bg-white p-4 shadow-2xl transition-all duration-300" aria-live="polite" aria-atomic="true">
+        <div class="ubis-toast-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-full">
+            <i id="iaToastIcon" data-lucide="check-circle-2" class="h-4 w-4"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+            <p id="iaToastTitle" class="text-xs font-bold text-slate-800">Success</p>
+            <p id="iaToastMessage" class="mt-0.5 text-[11px] text-slate-500"></p>
+        </div>
+        <button id="iaToastClose" type="button" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-4 focus:ring-slate-100" aria-label="Close notification"><i data-lucide="x" class="h-4 w-4"></i></button>
+    </div>
+
+    <!-- Delete confirmation dialog -->
+    <div id="iaDeleteDialog" class="ubis-dialog-hide fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px] transition-opacity duration-200" role="dialog" aria-modal="true" aria-labelledby="iaDeleteDialogTitle" aria-hidden="true">
+        <div class="ubis-dialog-card w-full max-w-md rounded-2xl border border-red-100 bg-white p-5 shadow-2xl transition-all duration-200">
+            <div class="flex items-start gap-4">
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                    <i data-lucide="trash-2" class="h-5 w-5"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <h2 id="iaDeleteDialogTitle" class="text-base font-bold text-slate-900">Delete</h2>
+                    <p class="mt-1 text-sm leading-5 text-slate-500">Are you sure you want to delete?</p>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end gap-2">
+                <button id="iaCancelDeleteBtn" type="button" class="h-10 rounded-lg border border-slate-300 px-4 text-xs font-bold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100">Cancel</button>
+                <button id="iaConfirmDeleteBtn" type="button" class="inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-100"><i data-lucide="trash-2" class="h-4 w-4"></i>Delete record</button>
+            </div>
+        </div>
+    </div>
+</div>

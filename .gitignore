@@ -1,0 +1,75 @@
+# Build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.dll
+*.pdb
+
+# Publish output (dotnet publish, deploy staging)
+publish/
+PublishProfiles/*.pubxml.user
+
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.idea/
+
+# ASP.NET Core secrets and generated keys — never commit these
+**/App_Data/DataProtection-Keys/
+**/*DataProtection-Keys/
+**/appsettings.*.local.json
+**/appsettings.json
+**/appsettings.*.json
+secrets.json
+*.pfx
+*.key
+
+# Visual Studio / .NET local settings
+**/Properties/launchSettings.json
+**/Properties/PublishProfiles/
+
+# Node (UBS-Design mockup tooling)
+node_modules/
+npm-debug.log*
+
+# Logs
+logs/
+*.log
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# EF Core migrations bundles / local dev DB files
+*.mdf
+*.ldf
+*.bak
+db-backup/
+
+# Blue-green deploy working copies (see deploy/Deploy-BlueGreen.ps1)
+deploy/artifacts/
+deploy/*.zip
+
+# Claude Code project config/memory, and internal reference/staging folders not meant for the
+# shared team repo (client request 2026-08-14)
+.claude/
+Others/
+SQL Queries/
+
+# Reference-only documents (FRS drafts, data exports, spec docs) — not project source, never
+# committed regardless of where they land in the tree (client request 2026-08-25)
+*.xls
+*.xlsx
+*.doc
+*.docx
+*.pdf
+
+# Local admin convenience script (client request 2026-08-31) - not a shared team artifact, never
+# committed. Tools/PasswordHasher (the reusable hasher it calls) IS tracked, same as
+# UBIS_Web/Tools/MenuScaffolder - only this root-level wrapper is excluded.
+/Reset-UserPasswordToDefault.ps1

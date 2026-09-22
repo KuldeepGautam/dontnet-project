@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/Application/">
+    <Project Path="Application/ReferenceData.Application.csproj" />
+  </Folder>
+  <Folder Name="/Domain/">
+    <Project Path="Domain/ReferenceData.Domain.csproj" />
+  </Folder>
+  <Folder Name="/Infrastructure/">
+    <Project Path="Infrastructure/ReferenceData.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/WebApi/">
+    <Project Path="WebApi/ReferenceData.WebApi.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,58 @@
+Import-Module WebAdministration
+
+$services = @(
+    @{ Name = "AIM";           Project = "E:\UBIS_DEV\Core\AIM\WebApi\AIM.WebApi.csproj";                        Pool = "ubis-aim";          Dest = "C:\inetpub\wwwroot\ubis-aim" },
+    @{ Name = "Reporting";     Project = "E:\UBIS_DEV\Core\Reporting\WebApi\Reporting.WebApi.csproj";            Pool = "reporting";         Dest = "C:\inetpub\wwwroot\reporting" },
+    @{ Name = "ECL";           Project = "E:\UBIS_DEV\Domain\ECL\WebApi\ECL.WebApi.csproj";                      Pool = "ubis-ecl";          Dest = "C:\inetpub\wwwroot\ubis-ecl" },
+    @{ Name = "Gateway";       Project = "E:\UBIS_DEV\Gateway\UBIS.ApiGateway\UBIS.ApiGateway.csproj";           Pool = "ubis-gateway";      Dest = "C:\inetpub\wwwroot\ubis-gateway" },
+    @{ Name = "Email";         Project = "E:\UBIS_DEV\Core\Email\WebApi\Email.WebApi.csproj";                    Pool = "ubis-email";        Dest = "C:\inetpub\wwwroot\ubis-email" },
+    @{ Name = "LogWriter";     Project = "E:\UBIS_DEV\Core\LogWriter\LogWriter.csproj";                          Pool = "ubis-logwriter";    Dest = "C:\inetpub\wwwroot\ubis-logwriter" },
+    @{ Name = "MenuGenerator"; Project = "E:\UBIS_DEV\Core\MenuGenerator\WebApi\MenuGenerator.WebApi.csproj";    Pool = "ubis-menuservice";  Dest = "C:\inetpub\wwwroot\ubis-menuservice" },
+    @{ Name = "PreBudget";     Project = "E:\UBIS_DEV\Domain\PreBudget\WebApi\PreBudget.WebApi.csproj";          Pool = "ubis-prebudget";    Dest = "C:\inetpub\wwwroot\ubis-prebudget" },
+    @{ Name = "Reference";     Project = "E:\UBIS_DEV\Shared\ReferenceData\WebApi\ReferenceData.WebApi.csproj";  Pool = "ubis-reference";    Dest = "C:\inetpub\wwwroot\ubis-reference" },
+    @{ Name = "UserProfile";   Project = "E:\UBIS_DEV\Shared\UserProfile\WebApi\UserProfile.WebApi.csproj";      Pool = "ubis-userprofile";  Dest = "C:\inetpub\wwwroot\ubis-userprofile" },
+    @{ Name = "UBIS_Web";      Project = "E:\UBIS_DEV\UBIS_Web\UBIS_Web.csproj";                                 Pool = "ubis-web";          Dest = "C:\inetpub\wwwroot\ubis-web" }
+)
+
+$publishTemp = "C:\PublishTemp"
+
+foreach ($svc in $services) {
+    Write-Host "`n=== Publishing $($svc.Name) ===" -ForegroundColor Cyan
+
+    # Project file exist karta hai ya nahi, pehle check karo
+    if (-not (Test-Path $svc.Project)) {
+        Write-Host "Project file NOT FOUND: $($svc.Project) — skipping." -ForegroundColor Red
+        continue
+    }
+
+    $tempPath = Join-Path $publishTemp $svc.Name
+
+    # Step 1: Build & publish to temp folder
+    dotnet publish $svc.Project -c Release -o $tempPath
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Build FAILED for $($svc.Name), skipping deploy." -ForegroundColor Red
+        continue
+    }
+
+    # Step 2: Ensure pool is stopped (already stopped hai, but safe check)
+    $poolState = (Get-WebAppPoolState -Name $svc.Pool).Value
+    if ($poolState -ne "Stopped") {
+        Write-Host "Stopping $($svc.Pool)..." -ForegroundColor Yellow
+        Stop-WebAppPool -Name $svc.Pool
+        Start-Sleep -Seconds 2
+    } else {
+        Write-Host "$($svc.Pool) already stopped." -ForegroundColor DarkGray
+    }
+
+    # Step 3: Copy files (excluding appsettings)
+    robocopy $tempPath $svc.Dest /MIR /XF "appsettings.json" "appsettings.*.json"
+
+    # Step 4: Start app pool
+    Write-Host "Starting $($svc.Pool)..." -ForegroundColor Green
+    Start-WebAppPool -Name $svc.Pool
+
+    Write-Host "$($svc.Name) deployed successfully." -ForegroundColor Cyan
+}
+
+Write-Host "`nAll services published and deployed!" -ForegroundColor Magenta

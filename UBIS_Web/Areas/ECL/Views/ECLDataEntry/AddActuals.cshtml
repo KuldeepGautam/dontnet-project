@@ -1,0 +1,94 @@
+@model UBIS.Web.Areas.ECL.Models.EclActualsViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Add Actuals";
+}
+
+<section class="panel overflow-hidden p-0 animate-fade-in">
+    <div class="heading text-center heading-bg justify-between items-center border-b rounded-t px-4 py-3 text-white font-bold">
+        ECL - Actuals Expenditure Entry
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="px-5 pt-4">
+            <p class="text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="status">@Model.StatusMessage</p>
+        </div>
+    }
+
+    <div class="flex flex-col gap-5 p-5">
+        <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
+            <label class="table-toolbar-field">
+                <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Financial Year</span>
+                <input type="text" value="@Model.FinancialYear" readonly class="input bg-slate-100 cursor-not-allowed font-medium text-slate-700" />
+            </label>
+            <label class="table-toolbar-field">
+                <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Demand Name</span>
+                <input type="text" value="@Model.DemandName" readonly class="input bg-slate-100 cursor-not-allowed font-medium text-slate-700" />
+            </label>
+        </div>
+
+        <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
+            <label class="table-toolbar-field">
+                <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Row to record Actuals for</span>
+                <select id="rowSelect" class="input truncate" data-navigate-base="@Url.Action("AddActuals")?demandId=@Model.DemandId&rowId=">
+                    <option value="">--Select a submitted scheme outlay row--</option>
+                    @foreach (var row in Model.SubmittedRows)
+                    {
+                        <option value="@row.RowId" selected="@(row.RowId == Model.SelectedRowId)">Row #@row.RowId - @row.DoeApprovalStatusDisplay</option>
+                    }
+                </select>
+            </label>
+        </div>
+
+        @if (Model.SelectedOutlay != null)
+        {
+            var outlay = Model.SelectedOutlay;
+            <form method="post" asp-action="AddActuals" autocomplete="off"
+                  data-autosave-key="ECL-AddActuals-@outlay.RowId" class="flex flex-col gap-4">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="rowId" value="@outlay.RowId" />
+                <input type="hidden" name="demandId" value="@Model.DemandId" />
+                <input type="hidden" name="categoryId" value="@Model.SelectedCategoryId" />
+
+                <div class="text-right text-red-600 font-medium text-xs md:text-sm italic mt-2">Amount in Crores of Rupees</div>
+
+                <div class="overflow-x-auto rounded-lg border border-slate-200">
+                    <table class="w-full min-w-max border-collapse text-center text-xs">
+                        <thead class="bg-slate-100 font-bold uppercase tracking-wider text-slate-700">
+                            <tr>
+                                @for (var i = 0; i < outlay.Outlay.Length; i++)
+                                {
+                                    <th class="border-b border-r border-slate-200 p-2.5">Year @(i + 1)</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                @for (var i = 0; i < outlay.Actuals.Length; i++)
+                                {
+                                    <td class="border-r border-slate-200 p-1.5">
+                                        <input type="text" class="input text-right py-1 text-xs" name="actuals[@i]" value="@(outlay.Actuals[i]?.ToString("0.00") ?? "0.00")" />
+                                    </td>
+                                }
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-4 flex justify-center gap-3">
+                    <button type="submit" class="btn-primary min-w-[120px]">Save Actuals</button>
+                    <button type="reset" class="btn-secondary">Reset</button>
+                </div>
+            </form>
+        }
+        else
+        {
+            <p class="text-sm text-slate-500">Select a submitted scheme outlay row above to record its Actuals.</p>
+        }
+    </div>
+</section>
+
+@section Scripts {
+    <script src="~/js/appendix-actions.js" asp-append-version="true"></script>
+    <script src="~/js/ecl.js" asp-append-version="true"></script>
+}

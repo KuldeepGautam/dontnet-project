@@ -1,0 +1,114 @@
+@model UBIS.Web.Areas.ECL.Models.EclReportViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Data Analysis";
+}
+
+<section class="panel overflow-hidden p-0 animate-fade-in">
+    <div class="heading text-center heading-bg justify-between items-center border rounded px-4 py-3 text-white">
+        @Model.Title
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="px-5 pt-4">
+            <p class="text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="status">@Model.StatusMessage</p>
+        </div>
+    }
+
+    <div class="flex flex-col gap-5 p-5">
+        <form id="dataAnalysisFilters" method="get" class="grid w-full grid-cols-1 gap-4 lg:grid-cols-3"
+              data-data-url="@Url.Action("DataAnalysisData")">
+            <label class="table-toolbar-field">
+                <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Financial Year</span>
+                <select name="financialYear" class="input truncate">
+                    @foreach (var y in Model.FinancialYearOptions)
+                    {
+                        <option value="@y" selected="@(y == Model.FinancialYear)">@y</option>
+                    }
+                </select>
+            </label>
+            <label class="table-toolbar-field">
+                <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Demand Name</span>
+                <select name="demandId" class="input truncate">
+                    <option value="">All</option>
+                    @foreach (var d in Model.Demands)
+                    {
+                        <option value="@d.DemandId" selected="@(d.DemandId == Model.SelectedDemandId)">@d.DemandNo-@d.DemandName</option>
+                    }
+                </select>
+            </label>
+            <label class="table-toolbar-field">
+                <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Category</span>
+                <select name="categoryId" class="input truncate">
+                    <option value="">All</option>
+                    @foreach (var c in Model.Categories)
+                    {
+                        <option value="@c.CategoryId" selected="@(c.CategoryId == Model.SelectedCategoryId)">@c.SerialNo - @c.CategoryName</option>
+                    }
+                </select>
+            </label>
+        </form>
+
+        <div class="flex flex-col gap-1 items-end sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex gap-2">
+                <a id="exportPdfLink" data-export-link href="@Url.Action("ExportPdf")" class="btn-secondary text-xs py-1 px-3">Export to PDF</a>
+                <a id="exportExcelLink" data-export-link href="@Url.Action("ExportExcel")" class="btn-secondary text-xs py-1 px-3">Export to Excel</a>
+            </div>
+            <div class="text-right text-red-600 font-medium text-xs md:text-sm italic">(In ₹ Crores)</div>
+        </div>
+
+        <div id="dataAnalysisLoading" class="flex items-center justify-center gap-3 py-10 text-slate-500">
+            <span class="inline-block h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-teal"></span>
+            Loading report data…
+        </div>
+
+        <div id="dataAnalysisEmpty" class="hidden empty-state-cell py-6 text-center text-slate-500">No data for the selected filters.</div>
+
+        <div id="dataAnalysisTables" class="hidden grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
+            <div class="overflow-x-auto rounded-lg border border-slate-200 shadow-sm">
+                <table id="dataAnalysisLeftTable" class="demo-table w-full text-xs">
+                    <colgroup>
+                        <col style="width:22%" />
+                        <col style="width:18%" />
+                        <col style="width:6%" /><col style="width:6%" /><col style="width:6%" /><col style="width:6%" /><col style="width:6%" />
+                        <col style="width:6%" /><col style="width:6%" /><col style="width:6%" /><col style="width:6%" /><col style="width:6%" />
+                    </colgroup>
+                    <thead>
+                        <tr><th colspan="12" class="text-center font-bold">Estimated Committed Liabilities</th></tr>
+                        <tr>
+                            <th>Demand / Scheme / Subscheme</th>
+                            <th>Category</th>
+                            @foreach (var y in Model.FinancialYearOptions)
+                            {
+                                <th>@y</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody id="dataAnalysisLeftBody"></tbody>
+                </table>
+            </div>
+            <div class="overflow-x-auto rounded-lg border border-slate-200 shadow-sm">
+                <table id="dataAnalysisRightTable" class="demo-table w-full text-xs">
+                    <colgroup>
+                        <col style="width:45%" />
+                        <col style="width:45%" />
+                        <col style="width:10%" />
+                    </colgroup>
+                    <thead>
+                        <tr><th colspan="3" class="text-center font-bold">Estimated Committed Liabilities</th></tr>
+                        <tr>
+                            <th>User Remarks</th>
+                            <th>Approver Remarks</th>
+                            <th>Approved By DOE</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dataAnalysisRightBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
+
+@section Scripts {
+    <script src="~/js/ecl.js" asp-append-version="true"></script>
+}

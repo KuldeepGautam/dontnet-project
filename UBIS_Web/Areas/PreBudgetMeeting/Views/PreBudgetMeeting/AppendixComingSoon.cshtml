@@ -1,0 +1,21 @@
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Appendix";
+    var code = ViewData["ComingSoonCode"] as string ?? "";
+    var name = ViewData["ComingSoonName"] as string ?? code;
+    var demandId = Context.Request.Query["demandId"];
+}
+
+<div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+    <p class="text-xs font-bold uppercase tracking-wide text-teal">@ViewData["Breadcrumb"]</p>
+    <h1 class="mt-1 text-xl font-black text-navy dark:text-white">Appendix @code &mdash; @name</h1>
+    <p class="mt-4 text-sm text-slate-500">
+        This appendix's data-entry screen isn't built yet. The database table, EF Core entity, and
+        SQL scripts already exist for all 22 appendices (see
+        <code>Others\Documentation\PreBudgetMeeting_TableDesign_Proposal_2026-07-23.md</code> §5) &mdash;
+        only Appendix I, II, and III-A currently have a full backend API + this UI wired end to end.
+        The remaining appendices follow the identical pattern and are the next build step.
+    </p>
+    <div class="mt-4">
+        <a class="btn-secondary" asp-action="PreBudgetDataandReport" asp-route-demandId="@demandId">Go Back</a>
+    </div>
+</div>

@@ -1,0 +1,148 @@
+@using UBIS.Web.Services.Session
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@{
+    var pageTitle = ViewData["Title"] as string ?? "UBIS Enterprise";
+    var csrfToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+
+    // Header profile widget (avatar/name/role) was hardcoded to "AGRICOOP"/"Data Operator" -
+    // bind it to the actual signed-in user's session data instead, same source the Dashboard
+    // banner and sidebar already read from (HttpContext.Session's UbisSessionData), not the
+    // Name/RoleName claims - RoleName's own claim is fixed at "" from login (see
+    // UserController.CompleteSignInAsync, role is resolved later and only ever written back to
+    // Session, never back into the cookie), so only Session has the live value.
+    var headerSession = Context.Session.GetUbisSession();
+    var headerFullName = headerSession?.FullName ?? User.Identity?.Name ?? string.Empty;
+    var headerRoleName = string.IsNullOrEmpty(headerSession?.RoleName) ? "Loading…" : headerSession.RoleName;
+    var headerInitials = string.Concat(headerFullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => char.ToUpperInvariant(p[0])));
+}
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="@csrfToken">
+    <title>@pageTitle - UBIS Enterprise</title>
+    <link rel="stylesheet" href="~/css/tailwind.css" asp-append-version="true">
+    <script src="~/vendor/lucide.min.js" defer></script>
+    <link rel="stylesheet" href="~/css/styles.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/css/prebudget.css" asp-append-version="true">
+    <script src="~/js/header-new.js"></script>
+    <!-- "Approved design for all appendixes" (2026-09-03) - scoped under .ubis-modern-appendix,
+         see the file's own header comment for why it's not applied globally by default. Loaded
+         sitewide (not per-page) so every future redesigned appendix can opt in without another
+         layout change. -->
+    <link rel="stylesheet" href="~/css/appendix-drawer-design.css" asp-append-version="true">
+</head>
+<body class="min-h-full bg-[#f7fbff] text-slate-800 dark:bg-slate-950 dark:text-slate-100">
+    @await Component.InvokeAsync("SidebarMenu")
+    @* <div id="identityLine" class="identity-line"></div>  *@
+    <div id="drawerOverlay" class="fixed inset-0 z-30 hidden bg-slate-950/40 lg:hidden identity-line"></div>
+
+    <div id="navLoaderOverlay" class="ubis-loading-overlay" role="status" aria-live="polite">
+        <div class="ubis-loading-spinner" aria-hidden="true"></div>
+        <p class="ubis-loading-text">Loading&hellip;</p>
+    </div>
+
+    <div id="appFrame" class="lg:pl-72 transition-all duration-300">
+        @* Masthead restyled 2026-09-10 to the approved PreBudget designer header
+           (UBIS-Pre-budget-html/assets/includes/header.js): thin gradient identity line, bordered
+           square sidebar toggles, ~17px bold title + 10px subtitle, bordered round theme toggle.
+           Functional pieces kept as-is: #sidebarToggle / [data-sidebar-mobile] hooks, the
+           SessionCountdown component, #themeToggle (site.js theme switch), and _UserMenu. *@
+<header class="sticky top-0 z-30 flex h-[85px] items-center justify-between border-b border-slate-200 bg-white/95 px-3 backdrop-blur sm:px-5 lg:px-7">
+  <div class="header-identity">
+    <button id="sidebarToggle" type="button" onclick="toggleSidebar()" aria-controls="sidebar" aria-expanded="true"
+      aria-label="Collapse sidebar" class="sidebar-toggle-button"><i data-lucide="panel-left-close"
+        class="h-4 w-4"></i></button>
+    <button id="mobileNavToggle" type="button" onclick="toggleMobileNav()" aria-controls="sidebar" aria-expanded="false"
+      aria-label="Open navigation menu" class="mobile-nav-toggle-button"><i data-lucide="menu"
+        class="h-5 w-5"></i></button>
+    <div class="header-identity"><img src="/images/ubis_Logo.png" alt="Union Budget Information System" width="150"
+        height="60" class="h-auto w-[110px] sm:w-[150px]">
+      <div class="desktop-title">
+        <h1 class="truncate text-[17px] font-bold tracking-tight text-ubis-navy">Union Budget Information System</h1>
+        <p class="truncate text-[10px] font-medium text-slate-500">Department of Economic Affairs, Ministry of Finance
+        </p>
+      </div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <div class="positioned-context"><button id="accessibilityButton" type="button" aria-haspopup="menu"
+        aria-expanded="false" aria-controls="accessibilityMenu" aria-label="Accessibility options"
+        class="header-icon-button"><i data-lucide="sun-moon" class="h-4 w-4"></i></button>
+      <div id="accessibilityMenu" role="menu" aria-label="Accessibility options"
+        class="header-menu header-dropdown header-dropdown--accessibility is-hidden">
+        <p class="px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">Accessibility</p><button
+          type="button" role="menuitem" data-font-action="increase" class="header-menu-item"><i
+            data-lucide="zoom-in"></i>Increase text</button><button type="button" role="menuitem"
+          data-font-action="decrease" class="header-menu-item"><i data-lucide="zoom-out"></i>Decrease
+          text</button><button type="button" role="menuitem" data-font-action="reset" class="header-menu-item"><i
+            data-lucide="rotate-ccw"></i>Reset text</button><button type="button" role="menuitem" data-contrast-toggle
+          class="header-menu-item"><i data-lucide="contrast"></i>High contrast</button><button type="button"
+          role="menuitem" data-dark-toggle class="header-menu-item"><i data-lucide="moon"></i><span>Dark
+            mode</span><span data-dark-status class="header-status">Off</span></button>
+      </div>
+    </div>
+    @if (User.Identity?.IsAuthenticated == true)
+   {
+       @await Component.InvokeAsync("SessionCountdown")
+   }
+    <button type="button" aria-label="Notifications, 4 unread" class="alerts-button"><i data-lucide="bell"
+        class="h-4 w-4"></i><span class="alerts-label">Alerts</span><span class="alerts-count">4</span></button>
+    <div class="positioned-context"><button id="profileButton" type="button" aria-haspopup="menu" aria-expanded="false"
+        aria-controls="profileMenu" class="profile-button"><span class="profile-avatar">@headerInitials</span><span
+          class="profile-copy"><span class="profile-name">@headerFullName</span><span id="headerProfileRoleName" class="profile-role">@headerRoleName</span></span><i data-lucide="chevron-down" class="h-3.5 w-3.5 text-slate-400"></i></button>
+      <div id="profileMenu" role="menu" aria-label="User account"
+        class="header-menu header-dropdown header-dropdown--profile is-hidden">
+        <div class="profile-menu-summary">
+          <p class="text-xs font-bold text-slate-800">@headerFullName</p>
+          <p id="headerMenuRoleName" class="text-[11px] text-slate-500">@headerRoleName</p>
+        </div>
+        <a asp-area=""  asp-controller="UserProfile" asp-action="Index" role="menuitem"
+          class="header-menu-item"><i data-lucide="settings"></i>Profile Settings</a>
+          <form  asp-area="" asp-controller="User" asp-action="Logout" method="post">@Html.AntiForgeryToken()<button type="submit"
+          role="menuitem" class="header-menu-item text-red-600 hover:bg-red-50 w-full text-left"><i data-lucide="log-out"></i>Logout</button></form>
+      </div>
+    </div>
+  </div>
+</header>   
+
+
+        <main role="main" class="px-4 py-6 sm:px-6 lg:px-8">
+            @RenderBody()
+        </main>
+
+        <footer class="column-menu-footer text-slate-500">Union Budget Information System - Department of Economic Affairs, Ministry of Finance</footer>
+    </div>
+
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <div id="sessionExpiryModal" class="modal-backdrop" role="presentation">
+            <section class="verify-modal" role="dialog" aria-modal="true" aria-labelledby="sessionExpiryTitle" aria-describedby="sessionExpiryDescription">
+                <header class="modal-header">
+                    <div>
+                        <h2 id="sessionExpiryTitle">Session Expiring</h2>
+                        <p id="sessionExpiryDescription">Your session is going to expire in <span id="sessionExpiryCountdown">2:00</span> minutes due to inactivity.</p>
+                    </div>
+                </header>
+                <div class="modal-body">
+                    <p>Click OK to stay signed in, or your session will end automatically when the timer reaches zero.</p>
+                    <div class="modal-actions">
+                        <button type="button" class="confirm" id="sessionExpiryOk">OK</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    }
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/dialogs.js" asp-append-version="true"></script>
+    <script src="~/js/autosave.js" asp-append-version="true"></script>
+    <script src="~/js/session-monitor.js" asp-append-version="true"></script>
+    <script src="~/js/dashboard-bootstrap.js" asp-append-version="true"></script>
+    <script src="~/js/prebudget.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

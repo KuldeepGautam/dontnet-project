@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>UBIS.Services.Reporting.Infrastructure</RootNamespace>
+    <AssemblyName>Reporting.Infrastructure</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Infrastructure layer depends on Application and Domain -->
+    <ProjectReference Include="..\Application\Reporting.Application.csproj" />
+    <ProjectReference Include="..\Domain\Reporting.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Needed for HttpContext/RequestDelegate (CallerRestrictionMiddleware) — matches ECL/PreBudget's Infrastructure.csproj. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- MIT-licensed, no revenue-based restrictions — deliberate choice for a government system that
+         may be reused by 50+ future pages, where a usage-based commercial license would be a real
+         compliance risk. -->
+    <PackageReference Include="PDFsharp-MigraDoc" Version="6.2.4" />
+    <PackageReference Include="ClosedXML" Version="0.105.1" />
+
+    <!-- AppSettingsReader / CallerRestrictionMiddleware — DB-backed feature flags, same shared
+         dbo.AppSettings table every other microservice reads. -->
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
+    <!-- Pinned as its Jwt sibling package (not Tokens directly) so Microsoft.IdentityModel.Tokens and
+         Microsoft.IdentityModel.JsonWebTokens resolve to the same version in lockstep — pinning Tokens
+         alone left JsonWebTokens on an older transitive version, causing a runtime
+         MissingMethodException in TokenValidationResult. Matches ECL.Infrastructure.csproj's own fix. -->
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
+  </ItemGroup>
+
+</Project>

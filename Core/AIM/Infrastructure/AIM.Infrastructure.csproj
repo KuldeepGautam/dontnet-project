@@ -1,0 +1,74 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>UBIS.Services.Aim.Infrastructure</RootNamespace>
+    <AssemblyName>AIM.Infrastructure</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Infrastructure layer depends on Application and Domain -->
+    <ProjectReference Include="..\Application\AIM.Application.csproj" />
+    <ProjectReference Include="..\Domain\AIM.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- EF Core packages for persistence -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    
+    <!-- Redis caching -->
+    <PackageReference Include="StackExchange.Redis" Version="2.8.0" />
+
+    <!-- JWT issuance/validation -->
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
+
+    <!-- Messaging: publishes OTP send requests to EmailService, log events to LogWriter -->
+    <PackageReference Include="RabbitMQ.Client" Version="7.2.1" />
+
+    <!-- Resilience for the Section-4 dual-routing message toggle (retry around the RabbitMQ
+         publish itself, not an HTTP call — Polly's core builder, not the HTTP-specific package). -->
+    <PackageReference Include="Polly.Core" Version="8.7.0" />
+
+    <!-- IConfiguration.GetValue<T>() extension method (Section-4 EnableEmailFeatures flag) -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.0" />
+    
+    <!-- Security and cryptography -->
+    <PackageReference Include="BCrypt.Net-Next" Version="4.2.1" />
+
+    <!-- Mobile-number encryption (Workstream 7, added 2026-08-17) — this is a plain class library
+         (Microsoft.NET.Sdk, not Sdk.Web), so unlike AIM.WebApi it has no implicit access to the
+         ASP.NET Core shared framework's Data Protection types without this explicit reference. -->
+    <!-- Pinned to 10.0.11 (not the 10.0.0 floor other packages here use) — 10.0.0 carries a known
+         critical-severity CVE (NU1904, GHSA-9mv3-2cwr-p262) that's fixed in this patch release. -->
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="10.0.11" />
+
+    <!-- Direct override: forces NuGet to resolve the patched version instead of the vulnerable
+         9.0.0 pulled in transitively (by Microsoft.EntityFrameworkCore.Design/System.IdentityModel.Tokens.Jwt).
+         Bumped 10.0.9 -> 10.0.10 (2026-08-03): 10.0.9 itself picked up 5 new high-severity CVEs
+         (NU1903) after this override was first added - re-check for a newer patch release if this
+         warning reappears; a version pin like this doesn't self-update. -->
+    <!-- Bumped 10.0.10 -> 10.0.11 (2026-08-17) alongside the new DataProtection reference below,
+         which itself depends on System.Security.Cryptography.Xml >= 10.0.11 - without this bump
+         NuGet reports a package downgrade error. -->
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.11" />
+
+    <!-- Logging -->
+    <!-- Bumped 10.0.0 -> 10.0.11 (2026-08-17): the new DataProtection reference below depends on
+         Microsoft.Extensions.Logging.Abstractions >= 10.0.11. -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.11" />
+  </ItemGroup>
+
+</Project>

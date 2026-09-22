@@ -1,0 +1,519 @@
+@model UBIS.Web.Areas.ECL.Models.EclEntryViewModel
+@using UBIS.Web.Services.Clients
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Add Scheme Outlay";
+}
+
+<section class="panel overflow-hidden p-0 animate-fade-in">
+    <div class="heading text-center heading-bg justify-between items-center border-b rounded-t px-4 py-3 text-white font-bold">
+        ECL - Outlay Data Entry
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="px-5 pt-4">
+            <p class="text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="status">@Model.StatusMessage</p>
+        </div>
+    }
+
+    <form id="addSchemeOutlayForm" method="post" asp-action="AddSchemeOutlay" autocomplete="off" novalidate
+          data-autosave-key="ECL-AddSchemeOutlay-@Model.DemandId" class="flex flex-col gap-5 p-5">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="RowId" value="@Model.SelectedOutlay?.RowId" />
+        <input type="hidden" name="FileName" id="fileNameHidden" value="@Model.SelectedOutlay?.FileName" />
+
+        <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
+            <label class="table-toolbar-field">
+                <span class="text-xs uppercase tracking-wider text-slate-600">Financial Year</span>
+                <input type="text" value="@Model.FinancialYear" readonly class="input bg-slate-100 cursor-not-allowed font-medium text-slate-700" />
+                <input type="hidden" name="FinancialYear" value="@Model.FinancialYear" />
+            </label>
+
+            <label class="table-toolbar-field">
+                <span class="text-xs uppercase tracking-wider text-slate-600">Demand Name</span>
+                <input type="text" value="@(Model.DemandNo + " - " + Model.DemandName)" readonly class="input bg-slate-100 cursor-not-allowed font-medium text-slate-700" />
+                <input type="hidden" id="demandIdField" name="DemandId" value="@Model.DemandId" />
+            </label>
+        </div>
+
+        <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
+            <label class="table-toolbar-field">
+                <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Category</span>
+                <select id="categorySelect" name="CategoryId" class="input truncate" data-schemes-url="@Url.Action("GetSchemes")">
+                    <option value="">--Select--</option>
+                    @foreach (var c in Model.Categories)
+                    {
+                        <option value="@c.CategoryId" selected="@(c.CategoryId == Model.SelectedCategoryId)">@c.SerialNo - @c.CategoryName</option>
+                    }
+                </select>
+            </label>
+
+            <label class="table-toolbar-field">
+                <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Scheme</span>
+                <select id="schemeSelect" name="SchemeId" class="input truncate">
+                    <option value="">--Select Scheme--</option>
+                    @foreach (var s in Model.Schemes.OrderBy(s => s.SchemeSrNo))
+                    {
+                        <option value="@s.SchemeId" selected="@(s.SchemeId == Model.SelectedSchemeId)">@(s.SchemeSrNo ?? 0) - @s.SchemeName</option>
+                    }
+                </select>
+            </label>
+        </div>
+
+        <div class="flex flex-col gap-1">
+            <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Whether requires approval during 16th FC cycle?</span>
+            <div class="flex items-center gap-6 mt-1">
+                <label class="inline-flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+                    <input type="radio" name="Is16Fc" value="Y" class="w-4 h-4 text-green-600 border-slate-300 focus:ring-green-500" checked="@(Model.SelectedOutlay?.Is16Fc == "Y")"> Yes
+                </label>
+                <label class="inline-flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+                    <input type="radio" name="Is16Fc" value="N" class="w-4 h-4 text-green-600 border-slate-300 focus:ring-green-500" checked="@(Model.SelectedOutlay?.Is16Fc == "N")"> No
+                </label>
+            </div>
+        </div>
+
+        <!-- Case Yes -->
+        <div id="caseYesFields" class="@(Model.SelectedOutlay?.Is16Fc == "Y" ? "" : "hidden") flex flex-col gap-4">
+            <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
+                <label class="table-toolbar-field">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Total Outlay <span class="text-red-500">*</span></span>
+                    <input type="number" step="0.01" id="totalOutlay" name="TotalOutlay" placeholder="0.00" value="@Model.SelectedOutlay?.TotalOutlay" class="input text-left" />
+                </label>
+                <label class="table-toolbar-field">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Central Share <span class="text-red-500">*</span></span>
+                    <input type="number" step="0.01" id="centralShare" name="CentralShare" placeholder="0.00" value="@Model.SelectedOutlay?.CentralShare" class="input text-left" />
+                </label>
+            </div>
+
+            <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
+                <label class="table-toolbar-field">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Percentage of Central Share (preview only)</span>
+                    <div class="flex items-center gap-1">
+                        <input type="text" id="centralSharePercentagePreview" value="@(Model.SelectedOutlay?.CentralSharePercentage?.ToString("0.00") ?? "0.00")" readonly class="input bg-slate-100 text-right font-semibold text-slate-700" />
+                        <span class="font-bold text-slate-600">%</span>
+                    </div>
+                </label>
+                <label class="table-toolbar-field">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Scheme End Year <span class="text-red-500">*</span></span>
+                    <select id="schemeEndYear" name="SchemeEndYear" class="input truncate">
+                        <option value="">Select</option>
+                        @foreach (var y in Model.SchemeEndYearOptions)
+                        {
+                            <option value="@y" selected="@(y == Model.SelectedOutlay?.SchemeEndYear)">@y</option>
+                        }
+                    </select>
+                </label>
+            </div>
+
+            <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
+                <div class="table-toolbar-field">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Appraisal Authority</span>
+                    <div class="flex items-center gap-2">
+                        <select id="appraisalAuthYes" name="AppraisalAuth" class="input truncate">
+                            <option value="">--Select--</option>
+                            @foreach (var a in Model.AppraiseAuthorities.OrderBy(a => a.DisplaySequenceNo))
+                            {
+                                <option value="@a.AppraiseName" selected="@(a.AppraiseName == Model.SelectedOutlay?.AppraisalAuth)">@a.AppraiseName</option>
+                            }
+                            <option value="Others">Others</option>
+                        </select>
+                        <input type="text" id="appraisalAuthOtherYes" name="AppraisalAuthOther" placeholder="Specify others" class="hidden input py-1 text-xs w-full max-w-[200px]" />
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-1">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Whether apprised</span>
+                    <div class="flex items-center gap-4 mt-1">
+                        <label class="inline-flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+                            <input type="radio" name="WhetherAppraised" value="Y" class="w-4 h-4 text-green-600 border-slate-300 focus:ring-green-500" checked="@(Model.SelectedOutlay?.WhetherAppraised == "Y")"> Yes
+                        </label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+                            <input type="radio" name="WhetherAppraised" value="N" class="w-4 h-4 text-green-600 border-slate-300 focus:ring-green-500" checked="@(Model.SelectedOutlay?.WhetherAppraised == "N")"> No
+                        </label>
+                        <input type="text" id="appraisalStatusInput" name="AppraisalStatusRemarks" placeholder="If No, provide status" value="@Model.SelectedOutlay?.AppraisalStatusRemarks" class="@(Model.SelectedOutlay?.WhetherAppraised == "N" ? "" : "hidden") input py-1 text-xs w-full max-w-[220px]" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
+                <div class="table-toolbar-field">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Approval Authority</span>
+                    <div class="flex items-center gap-2">
+                        <select id="approvalAuthYes" name="ApproveAuth" class="input truncate">
+                            <option value="">--Select--</option>
+                            @foreach (var a in Model.ApprovalAuthorities.OrderBy(a => a.DisplaySequenceNo))
+                            {
+                                <option value="@a.AuthorityName" selected="@(a.AuthorityName == Model.SelectedOutlay?.ApproveAuth)">@a.AuthorityName</option>
+                            }
+                            <option value="Others">Others</option>
+                        </select>
+                        <input type="text" id="approvalAuthOtherYes" name="ApproveAuthOther" placeholder="Specify others" class="hidden input py-1 text-xs w-full max-w-[200px]" />
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-1">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Whether approved</span>
+                    <div class="flex items-center gap-4 mt-1">
+                        <label class="inline-flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+                            <input type="radio" name="IsApproved" value="Y" class="w-4 h-4 text-green-600 border-slate-300 focus:ring-green-500" checked="@(Model.SelectedOutlay?.IsApproved == "Y")"> Yes
+                        </label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+                            <input type="radio" name="IsApproved" value="N" class="w-4 h-4 text-green-600 border-slate-300 focus:ring-green-500" checked="@(Model.SelectedOutlay?.IsApproved == "N")"> No
+                        </label>
+                        <input type="text" id="approvedStatusInput" name="NotApprovedRem" placeholder="If No, provide status" value="@Model.SelectedOutlay?.NotApprovedRem" class="@(Model.SelectedOutlay?.IsApproved == "N" ? "" : "hidden") input py-1 text-xs w-full max-w-[220px]" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Case No -->
+        <div id="caseNoFields" class="@(Model.SelectedOutlay?.Is16Fc == "N" ? "" : "hidden") flex flex-col gap-4">
+            <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-3">
+                <label class="table-toolbar-field">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Total Outlay <span class="text-red-500">*</span></span>
+                    <input type="number" step="0.01" name="TotalOutlay" placeholder="0.00" value="@(Model.SelectedOutlay?.Is16Fc == "N" ? Model.SelectedOutlay?.TotalOutlay : null)" class="input text-left" />
+                </label>
+                <label class="table-toolbar-field">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Remaining Outlay <span class="text-red-500">*</span></span>
+                    <input type="number" step="0.01" name="RemainingOutlay" placeholder="0.00" class="input text-left" />
+                </label>
+                <label class="table-toolbar-field">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Scheme End Year <span class="text-red-500">*</span></span>
+                    <select name="SchemeEndYear" class="input truncate">
+                        <option value="">Select</option>
+                        @foreach (var y in Model.SchemeEndYearOptions)
+                        {
+                            <option value="@y" selected="@(Model.SelectedOutlay?.Is16Fc == "N" && y == Model.SelectedOutlay?.SchemeEndYear)">@y</option>
+                        }
+                    </select>
+                </label>
+            </div>
+
+            <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
+                <div class="table-toolbar-field">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Competent Appraisal Authority</span>
+                    <div class="flex items-center gap-2">
+                        <select id="appraisalAuthNo" name="AppraisalAuth" class="input truncate">
+                            <option value="">--Select--</option>
+                            @foreach (var a in Model.AppraiseAuthorities.OrderBy(a => a.DisplaySequenceNo))
+                            {
+                                <option value="@a.AppraiseName" selected="@(Model.SelectedOutlay?.Is16Fc == "N" && a.AppraiseName == Model.SelectedOutlay?.AppraisalAuth)">@a.AppraiseName</option>
+                            }
+                            <option value="Others">Others</option>
+                        </select>
+                        <input type="text" id="appraisalAuthOtherNo" name="AppraisalAuthOther" placeholder="Specify others" class="hidden input py-1 text-xs w-full max-w-[200px]" />
+                    </div>
+                </div>
+
+                <div class="table-toolbar-field">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Competent Approval Authority</span>
+                    <div class="flex items-center gap-2">
+                        <select id="approvalAuthNo" name="ApproveAuth" class="input truncate">
+                            <option value="">--Select--</option>
+                            @foreach (var a in Model.ApprovalAuthorities.OrderBy(a => a.DisplaySequenceNo))
+                            {
+                                <option value="@a.AuthorityName" selected="@(Model.SelectedOutlay?.Is16Fc == "N" && a.AuthorityName == Model.SelectedOutlay?.ApproveAuth)">@a.AuthorityName</option>
+                            }
+                            <option value="Others">Others</option>
+                        </select>
+                        <input type="text" id="approvalAuthOtherNo" name="ApproveAuthOther" placeholder="Specify others" class="hidden input py-1 text-xs w-full max-w-[200px]" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
+                <div class="flex flex-col gap-1">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Whether apprised</span>
+                    <div class="flex items-center gap-4 mt-1">
+                        <label class="inline-flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+                            <input type="radio" name="WhetherAppraised" value="Y" class="w-4 h-4 text-green-600 border-slate-300 focus:ring-green-500" checked="@(Model.SelectedOutlay?.Is16Fc == "N" && Model.SelectedOutlay?.WhetherAppraised == "Y")"> Yes
+                        </label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+                            <input type="radio" name="WhetherAppraised" value="N" class="w-4 h-4 text-green-600 border-slate-300 focus:ring-green-500" checked="@(Model.SelectedOutlay?.Is16Fc == "N" && Model.SelectedOutlay?.WhetherAppraised == "N")"> No
+                        </label>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Whether approved</span>
+                    <div class="flex items-center gap-4 mt-1">
+                        <label class="inline-flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+                            <input type="radio" name="IsApproved" value="Y" class="w-4 h-4 text-green-600 border-slate-300 focus:ring-green-500" checked="@(Model.SelectedOutlay?.Is16Fc == "N" && Model.SelectedOutlay?.IsApproved == "Y")"> Yes
+                        </label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+                            <input type="radio" name="IsApproved" value="N" class="w-4 h-4 text-green-600 border-slate-300 focus:ring-green-500" checked="@(Model.SelectedOutlay?.Is16Fc == "N" && Model.SelectedOutlay?.IsApproved == "N")"> No
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-col gap-4">
+            <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2 items-center">
+                <label class="table-toolbar-field">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Upload File (Copy of Approval)</span>
+                    <div class="flex items-center gap-3">
+                        <input type="file" id="file-upload" accept="application/pdf" class="text-xs text-slate-700"
+                               data-upload-url="@Url.Action("UploadDocument")" data-demand-field="DemandId" data-scheme-field="SchemeId" data-filename-target="fileNameHidden" />
+                        <span class="text-xs text-red-600 italic">(file size should be less than 5 MB)</span>
+                    </div>
+                    <span id="file-upload-warning" class="text-xs text-red-600"></span>
+                    <span id="file-upload-status" class="text-xs text-teal"></span>
+                </label>
+            </div>
+
+            <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
+                <label class="table-toolbar-field">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Remarks</span>
+                    <textarea class="input h-16 resize-y" name="UserRemarks" placeholder="Enter remarks...">@Model.SelectedOutlay?.UserRemarks</textarea>
+                </label>
+            </div>
+        </div>
+
+        <div class="text-right text-red-600 font-medium text-xs md:text-sm italic mt-2">Amount in crores of Rupees</div>
+
+        <div class="w-full max-w-full min-w-0 overflow-x-auto rounded-lg border border-slate-200">
+            <table id="outlayGridTable" class="w-full border-collapse text-center text-xs">
+                <thead class="bg-slate-100 font-bold uppercase tracking-wider text-slate-700">
+                    <tr>
+                        <th colspan="@Model.OutlayYearColumns.Count" class="border-b border-slate-200 p-2.5 text-center font-bold text-sm">Outlay</th>
+                    </tr>
+                    <tr>
+                        @foreach (var y in Model.OutlayYearColumns)
+                        {
+                            <th class="border-b border-r border-slate-200 p-2.5">@y</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        @for (var i = 0; i < Model.OutlayYearColumns.Count; i++)
+                        {
+                            <td class="border-r border-slate-200 p-1.5">
+                                <input type="text" class="input text-right py-1 text-xs" name="Outlay[@i]"
+                                       data-outlay-year="@Model.OutlayYearColumns[i]" value="@((Model.SelectedOutlay?.Outlay != null && i < Model.SelectedOutlay.Outlay.Length ? Model.SelectedOutlay.Outlay[i] : null)?.ToString("0.00") ?? "0.00")" />
+                            </td>
+                        }
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-4 flex justify-center gap-3">
+            <button type="submit" class="btn-primary min-w-[120px]"><i data-lucide="save"></i> @(Model.SelectedOutlay != null ? "Update Data" : "Add Data")</button>
+            <button type="reset" class="btn-secondary min-w-[100px]">Reset</button>
+        </div>
+    </form>
+
+    @{
+        // Row-status -> color mapping (client spec 2026-08-18, matches the legend below the grid).
+        // ReapprovalByDoe is checked first since RequestReapproval() resets both SendToDoe and
+        // ApprovedByDoe back to "N" - without checking it first, a reapproval-pending row would be
+        // indistinguishable from a never-submitted draft.
+        string RowColorClass(EclSchemeOutlayDto row) =>
+            string.Equals(row.ReapprovalByDoe, "Y", StringComparison.OrdinalIgnoreCase) ? "ecl-row-reapproval"
+            : string.Equals(row.ApprovedByDoe, "R", StringComparison.OrdinalIgnoreCase) ? "ecl-row-rejected"
+            : string.Equals(row.ApprovedByDoe, "Y", StringComparison.OrdinalIgnoreCase) ? "ecl-row-approved"
+            : string.Equals(row.SendToDoe, "Y", StringComparison.OrdinalIgnoreCase) ? "ecl-row-sent"
+            : "";
+    }
+    <!-- Saved-data grid for this Demand/FY -->
+    <div class="px-5 pb-5">
+        <h3 class="panel-title mb-3">Saved Scheme Outlays</h3>
+        <div class="w-full overflow-x-auto rounded-lg border border-slate-200">
+            <table id="savedOutlaysTable" class="demo-table w-full text-xs" data-page-size="10">
+                <colgroup>
+                    <col style="width:2%" />
+                    <col style="width:4%" />
+                    <col style="width:calc(17.8% - 10px)" />
+                    <col style="width:4%" />
+                    <col style="width:4%" />
+                    @for (var i = 0; i < Model.OutlayYearColumns.Count; i++)
+                    {
+                        <col style="width:calc(2.8% + 3px)" />
+                    }
+                    <col style="width:calc(13% - 10px)" />
+                    <col style="width:calc(13% - 10px)" />
+                    <col style="width:2.5%" />
+                    <col style="width:2.5%" />
+                    <col style="width:2.5%" />
+                    <col style="width:6.7%" />
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th rowspan="2">Sr.<br />No.</th>
+                        <th rowspan="2">Financial Year</th>
+                        <th rowspan="2">Name of Scheme</th>
+                        <th rowspan="2">Total Outlay</th>
+                        <th rowspan="2">C.Share</th>
+                        <th colspan="@Model.OutlayYearColumns.Count">Outlay</th>
+                        <th rowspan="2">User Remarks</th>
+                        <th rowspan="2">Approved Remarks</th>
+                        <th rowspan="2">File</th>
+                        <th rowspan="2">Edit</th>
+                        <th rowspan="2">Delete</th>
+                        <th rowspan="2">Action</th>
+                    </tr>
+                    <tr>
+                        @foreach (var y in Model.OutlayYearColumns)
+                        {
+                            <th>@y</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.SavedRows.Count == 0)
+                    {
+                        <tr><td colspan="@(11 + Model.OutlayYearColumns.Count)" class="empty-state-cell">No saved rows for this Demand/Financial Year.</td></tr>
+                    }
+                    else
+                    {
+                        var srNo = 0;
+                        @foreach (var row in Model.SavedRows)
+                        {
+                            srNo++;
+                            var schemeName = !string.IsNullOrEmpty(row.SchemeName) ? $"{row.SchemeSrNo ?? 0} - {row.SchemeName}" : $"Scheme #{row.SchemeId}";
+                            var canEditOrDelete = !string.Equals(row.SendToDoe, "Y", StringComparison.OrdinalIgnoreCase) || !string.Equals(row.ApprovedByDoe, "N", StringComparison.OrdinalIgnoreCase);
+                            <tr class="@RowColorClass(row)">
+                                <td class="text-center">@srNo</td>
+                                <td>@row.FinancialYear</td>
+                                <td class="text-left">@schemeName</td>
+                                <td class="text-right">@row.TotalOutlay?.ToString("N2")</td>
+                                <td class="text-right">@row.CentralShare?.ToString("N2")</td>
+                                @for (var i = 0; i < Model.OutlayYearColumns.Count; i++)
+                                {
+                                    <td class="text-right">@((row.Outlay != null && i < row.Outlay.Length ? row.Outlay[i] : null)?.ToString("N2") ?? "0.00")</td>
+                                }
+                                <td class="text-left">@row.UserRemarks</td>
+                                <td class="text-left">@row.DoeRemarks</td>
+                                <td class="text-center">
+                                    @if (!string.IsNullOrEmpty(row.FileName))
+                                    {
+                                        <button type="button" class="ecl-file-icon" data-view-document data-row-id="@row.RowId" title="View attached PDF" aria-label="View attached PDF">
+                                            <i data-lucide="file-text" class="text-red-600"></i>
+                                        </button>
+                                    }
+                                </td>
+                                <td class="text-center">
+                                    @if (canEditOrDelete)
+                                    {
+                                        <a class="table-icon-btn" asp-action="AddSchemeOutlay" asp-route-rowId="@row.RowId" asp-route-demandId="@Model.DemandId" asp-route-categoryId="@Model.SelectedCategoryId" title="Edit" aria-label="Edit">
+                                            <i data-lucide="pencil"></i>
+                                        </a>
+                                    }
+                                </td>
+                                <td class="text-center">
+                                    @if (canEditOrDelete)
+                                    {
+                                        <form method="post" asp-action="DeleteOutlay" class="inline" data-confirm-delete>
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="rowId" value="@row.RowId" />
+                                            <input type="hidden" name="demandId" value="@Model.DemandId" />
+                                            <input type="hidden" name="categoryId" value="@Model.SelectedCategoryId" />
+                                            <button type="submit" class="table-icon-btn appendix-action-delete" title="Delete" aria-label="Delete">
+                                                <i data-lucide="trash-2"></i>
+                                            </button>
+                                        </form>
+                                    }
+                                </td>
+                                <td class="whitespace-nowrap text-center">
+                                    @if (!string.Equals(row.SendToDoe, "Y", StringComparison.OrdinalIgnoreCase) && !string.Equals(row.ReapprovalByDoe, "Y", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <form method="post" asp-action="SendForApproval" class="inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="rowId" value="@row.RowId" />
+                                            <input type="hidden" name="demandId" value="@Model.DemandId" />
+                                            <input type="hidden" name="categoryId" value="@Model.SelectedCategoryId" />
+                                            <button type="submit" class="btn-secondary text-xs py-1 px-2">Send For Approval</button>
+                                        </form>
+                                    }
+                                    else if (string.Equals(row.ApprovedByDoe, "Y", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <button type="button" class="btn-secondary text-xs py-1 px-2" data-open-actuals-modal data-row-id="@row.RowId">Add Actuals</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div id="savedOutlaysPagination" class="flex items-center justify-center gap-3 mt-3 text-xs font-semibold text-slate-600"></div>
+
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-1 mt-3 text-xs font-bold">
+            <span class="ecl-legend-approved">*Approved by DOE</span>
+            <span class="ecl-legend-rejected">*Returned by DOE</span>
+            <span class="ecl-legend-sent">*Sent for Approval</span>
+            <span class="ecl-legend-reapproval">*Edit for Reapproval</span>
+        </div>
+    </div>
+</section>
+
+@* File-preview popup (client spec 2026-08-18: "file should open in popup") — same modal-backdrop/
+   verify-modal pattern as the Add Actuals modal / login screen's dialogs. Content streamed through
+   ECLDataEntryController.ViewDocument, which proxies EclOutlayController.GetDocument. *@
+<div id="viewDocumentModal" class="modal-backdrop" role="presentation">
+    <section class="verify-modal" role="dialog" aria-modal="true" aria-labelledby="viewDocumentTitle">
+        <header class="modal-header">
+            <div>
+                <h2 id="viewDocumentTitle">Attached Document</h2>
+            </div>
+            <button class="close-modal" type="button" id="viewDocumentClose" aria-label="Close"><i data-lucide="x" size="19" aria-hidden="true"></i></button>
+        </header>
+        <div class="modal-body" style="padding-top:0;">
+            <iframe id="viewDocumentFrame" src="about:blank" title="Attached document preview" style="width:100%;height:70vh;border:1px solid #e2e8f0;border-radius:8px;"></iframe>
+        </div>
+    </section>
+</div>
+
+@* Add Actuals modal (client request 2026-08-18: "avoid unnecessary page navigation" — same
+   modal-backdrop/verify-modal visual style and open/close pattern as the login screen's
+   #changePasswordDialog/#forgotPasswordDialog, see wwwroot/css/styles.css's ported copy of
+   wwwroot/css/login.css's modal classes). Populated via GetActualsForRow/SaveActualsAjax
+   (ECLDataEntryController), driven entirely by ecl.js — never navigates away from this page. *@
+<div id="addActualsModal" class="modal-backdrop" role="presentation">
+    <section class="verify-modal" role="dialog" aria-modal="true" aria-labelledby="addActualsTitle" aria-describedby="addActualsDescription">
+        <header class="modal-header">
+            <div>
+                <h2 id="addActualsTitle">Add Actuals</h2>
+                <p id="addActualsDescription">Record actual expenditure for the selected scheme.</p>
+            </div>
+            <button class="close-modal" type="button" id="addActualsClose" aria-label="Close"><i data-lucide="x" size="19" aria-hidden="true"></i></button>
+        </header>
+        <form id="addActualsForm" class="modal-body" novalidate data-get-url="@Url.Action("GetActualsForRow")" data-save-url="@Url.Action("SaveActualsAjax")" data-year-columns="@string.Join(",", Model.OutlayYearColumns)">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="addActualsRowId" name="rowId" value="" />
+            <p id="addActualsError" class="error" role="alert"></p>
+            <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
+                <label class="table-toolbar-field">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Scheme</span>
+                    <input type="text" id="addActualsSchemeName" readonly class="input bg-slate-100 cursor-not-allowed font-medium text-slate-700" />
+                </label>
+                <label class="table-toolbar-field">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Status</span>
+                    <input type="text" id="addActualsStatus" readonly class="input bg-slate-100 cursor-not-allowed font-medium text-slate-700" />
+                </label>
+            </div>
+            <div class="text-right text-red-600 font-medium text-xs italic mt-3">Amount in Crores of Rupees</div>
+            <div class="overflow-x-auto rounded-lg border border-slate-200 mt-1">
+                <table id="addActualsTable" class="w-full border-collapse text-center text-xs">
+                    <thead class="bg-slate-100 font-bold uppercase tracking-wider text-slate-700">
+                        <tr id="addActualsHeaderRow"></tr>
+                    </thead>
+                    <tbody>
+                        <tr id="addActualsInputRow"></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="cancel" id="addActualsCancel">Cancel</button>
+                <button type="submit" class="confirm">Save Actuals</button>
+            </div>
+        </form>
+    </section>
+</div>
+
+@section Scripts {
+    <script src="~/js/appendix-actions.js" asp-append-version="true"></script>
+    <script src="~/js/ecl.js" asp-append-version="true"></script>
+}

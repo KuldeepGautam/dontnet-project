@@ -1,0 +1,498 @@
+@model UBIS.Web.Areas.PreBudgetMeeting.Models.AppendixIVBViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Appendix IV-B - TASP Expenditure";
+    var yMinus2 = Model.PriorPriorFinancialYear;
+    var yMinus1 = Model.PriorFinancialYear;
+    var y = Model.FinancialYear;
+    var locked = Model.IsEntryLocked;
+
+    // Re-design 2026-09-15 (designer reference: UBIS-drawer-070926 "appendix-IVB.html") - same
+    // .ubis-modern-appendix drawer/grid theme as Appendix IV/IV-A/VI-A (see AppendixVIA.cshtml's
+    // header comment), not the designer's own unadopted field-group/grid-head-cell CSS system
+    // (see ubis2_appendix_redesign_reuse_shared_files memory). Filter & Context is Search-only,
+    // same client decision 2026-09-15 already applied to plain Appendix IV. Every NewRecord.*
+    // field id/name below is unchanged from the pre-redesign page - the Scheme/SubScheme cascade,
+    // the B.E. auto-load from SBE, and the live Saving/Excess recalc (shared with IV-A) all live
+    // in PreBudget-control-binding.js, already delegated on `document` - none of that JS needed
+    // to change for this drawer reparent. IV-B does NOT lock Scheme/SubScheme on Edit (confirmed
+    // existing business rule, same as IV/IV-A).
+}
+
+<div class="ubis-modern-appendix">
+    <section class="appendix-highlight mb-5 rounded-2xl border p-4">
+        <div class="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
+            <div class="flex items-start gap-3">
+                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-cyan-600 text-white shadow-lg shadow-indigo-200">
+                    <i data-lucide="file-spreadsheet" class="h-6 w-6"></i>
+                </div>
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-2xl font-extrabold tracking-tight text-indigo-950">Appendix IV-B</h2>
+                        @* <span id="ivbRecordCountBadge" class="rounded-full bg-white px-3 py-1 text-[10px] font-bold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200">@Model.Records.Count Record@(Model.Records.Count == 1 ? "" : "s")</span> *@
+                    @if (Model.IsAppendixFrozen)
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="freezedot"></span>Freezed
+                        </span>
+                    }
+                    else if (Model.IsNilSubmitted)
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="freezedot"></span>NIL
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="bluedot"></span>In Progress
+                        </span>
+                    }
+                    </div>
+                    <p class="mt-1.5 text-sm font-medium text-slate-600">TASP Expenditure</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                @* Same Nil/Freeze/Add gating as Appendix VI-A/IV/IV-A: Nil only while empty,
+                   Freeze only once at least one record exists, both posted via
+                   form="appendixIVBForm" since they now live in the page header rather than
+                   inside the <form>. *@
+                @if (Model.Records.Count == 0 && !locked)
+                {
+                    <button type="submit" form="appendixIVBForm" formnovalidate formaction="@Url.Action("SetNilSubmission")"
+                            class="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100">
+                        Nil
+                    </button>
+                }
+                @if (Model.Records.Count > 0 && !locked)
+                {
+                    <button type="submit" form="appendixIVBForm" formnovalidate formaction="@Url.Action("FreezeAppendixTemplate")"
+                            class="inline-flex h-10 items-center justify-center rounded-lg bg-orange-100 px-4 text-sm font-semibold freeze-button shadow-sm transition hover:bg-orange-200 focus:outline-none focus:ring-4 focus:ring-orange-100">
+                        Freeze Data
+                    </button>
+                }
+                @if (!locked)
+                {
+                    <button type="button" data-action="open-appendix-ivb-add-drawer"
+                            class="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-ubis-navy px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-ubis-dark focus:outline-none focus:ring-4 focus:ring-blue-100">
+                        <i data-lucide="plus" class="h-4 w-4"></i>Add
+                    </button>
+                }
+            </div>
+        </div>
+    </section>
+
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="mb-4">
+            <p class="text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="status">@Model.StatusMessage</p>
+        </div>
+    }
+
+    <!-- Data Grid -->
+    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
+        <div class="flex flex-col justify-between gap-3 border-b border-slate-100 px-5 py-3.5 sm:flex-row sm:items-center">
+            <div class="relative"><i data-lucide="search" class="absolute left-3 top-3 h-4 w-4 text-slate-400"></i><input id="ivbSearchInput" type="search" placeholder="Search scheme, sub-scheme..." class="search-control" /></div>
+            <div class="flex items-center gap-2">
+                <div class="relative">
+                    <button id="ivbColumnsButton" type="button"
+                            class="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="ivbColumnsMenu">
+                        <i data-lucide="columns-3" class="h-3.5 w-3.5"></i> Columns
+                    </button>
+                    <div id="ivbColumnsMenu" class="absolute right-0 top-10 z-30 hidden w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl" role="menu" aria-label="Choose visible columns">
+                        <div class="border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-cyan-50 px-4 py-3">
+                            <p class="text-xs font-bold text-slate-800">Visible columns</p>
+                            <p class="mt-0.5 text-[10px] text-slate-500">Choose the information shown in the table.</p>
+                        </div>
+                        <div class="space-y-1 p-2">
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="scheme" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Scheme Name</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="subscheme" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Sub-Scheme</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="actuals" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Actual @yMinus2</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="actualsuptoseptprevyear" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Actuals upto 9/@(yMinus2.Split('-')[0])</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="be" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">B.E. @yMinus1</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="actualsuptosept" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Actuals upto 9/@(yMinus1.Split('-')[0])</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="proposedre" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">R.E. @yMinus1 Proposed by Min/Dep</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="savingexcess" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Savings/Excess in R.E. over B.E.</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="proposednbe" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">B.E. @y Proposed by Min/Dep</label>
+                            @if (Model.ShowRemarksMinistryColumn)
+                            {
+                                <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="remarksministry" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Remarks (Ministry)</label>
+                            }
+                            @if (Model.ShowRemarksBudgetColumn)
+                            {
+                                <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="remarksbudget" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Remarks (Budget Div)</label>
+                            }
+                        </div>
+                        <div class="border-t border-slate-100 bg-slate-50 px-3 py-2.5">
+                            <button type="button" data-action="reset-appendix-ivb-columns" class="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50"><i data-lucide="rotate-ccw" class="h-3.5 w-3.5"></i>Reset columns</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="relative">
+                    <button id="ivbExportButton" type="button" data-action="toggle-appendix-ivb-export-menu"
+                            class="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="ivbExportMenu">
+                        <i data-lucide="download" class="h-3.5 w-3.5"></i> Export
+                        <i data-lucide="chevron-down" class="h-3 w-3 text-slate-400"></i>
+                    </button>
+                    <div id="ivbExportMenu" class="absolute right-0 top-10 z-30 hidden w-44 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-2xl">
+                        <button type="button" data-action="export-appendix-ivb" data-format="pdf"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-rose-600">
+                            <i data-lucide="file-text" class="h-4 w-4 text-rose-500"></i>
+                            <span>PDF</span>
+                        </button>
+                        <button type="button" data-action="export-appendix-ivb" data-format="excel"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-emerald-600">
+                            <i data-lucide="sheet" class="h-4 w-4 text-emerald-600"></i>
+                            <span>Excel</span>
+                        </button>
+                        <button type="button" data-action="export-appendix-ivb" data-format="csv"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-blue-600">
+                            <i data-lucide="file-spreadsheet" class="h-4 w-4 text-blue-500"></i>
+                            <span>CSV</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="ivbGridScroll" class="grid-scroll">
+            <span class="amtmsg">Amount in Crores of Rupees</span>
+            <table id="ivbChargesTable" class="ubis-data-grid">
+                <thead class="ubis-data-grid__head ubis-data-grid__head--plain">
+                    <tr class="data-grid__header-row">
+                        <th class="w-[4%] px-2 py-3 text-center">S.No.</th>
+                        <th data-column="scheme" class="w-[13%] px-2 py-3">
+                            <button type="button" data-sort-key="scheme" class="flex items-center gap-1.5">Scheme Name <i data-lucide="chevrons-up-down" class="h-3.5 w-3.5"></i></button>
+                        </th>
+                        <th data-column="subscheme" class="w-[12%] px-2 py-3">
+                            <button type="button" data-sort-key="subscheme" class="flex items-center gap-1">Sub-Scheme <i data-lucide="chevrons-up-down" class="h-3.5 w-3.5 shrink-0"></i></button>
+                        </th>
+                        <th data-column="actuals" class="w-[8%] px-2 py-3 text-right">Actual<br>@yMinus2</th>
+                        <th data-column="actualsuptoseptprevyear" class="w-[9%] px-2 py-3 text-right">Actuals upto<br>9/@(yMinus2.Split('-')[0])</th>
+                        <th data-column="be" class="w-[8%] px-2 py-3 text-right">B.E.<br>@yMinus1</th>
+                        <th data-column="actualsuptosept" class="w-[9%] px-2 py-3 text-right">Actuals upto<br>9/@(yMinus1.Split('-')[0])</th>
+                        <th data-column="proposedre" class="w-[9%] px-2 py-3 text-right">R.E. @yMinus1 Proposed<br>by Min/Dep</th>
+                        <th data-column="savingexcess" class="w-[9%] px-2 py-3 text-right">Savings/Excess in<br>R.E. over B.E.</th>
+                        <th data-column="proposednbe" class="w-[8%] px-2 py-3 text-right">B.E. @y Proposed<br>by Min/Dep</th>
+                        @if (Model.ShowRemarksMinistryColumn)
+                        {
+                            <th data-column="remarksministry" class="w-[7%] px-2 py-3">Remarks<br>(Ministry)</th>
+                        }
+                        @if (Model.ShowRemarksBudgetColumn)
+                        {
+                            <th data-column="remarksbudget" class="w-[7%] px-2 py-3">Remarks<br>(Budget Div)</th>
+                        }
+                        @if (!locked)
+                        {
+                            <th class="w-[4%] px-2 py-3 text-center">Action</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody id="ivbGridBody" class="divide-y divide-slate-100">
+                    @for (var i = 0; i < Model.Records.Count; i++)
+                    {
+                        var r = Model.Records[i];
+                        var status = "Active";
+                        // Client requirement 2026-09-21: search must match every visible numeric grid
+                        // column too, not just Scheme/Sub-Scheme name (see
+                        // ubis2_grid_sort_search_text_columns_only memory for the general default
+                        // this overrides, same override already applied to Appendix III/III-A).
+                        var searchHaystack = string.Join(" ", new[]
+                        {
+                            r.SchemeName, r.SubSchemeName, status,
+                            r.Actuals?.ToString("0.00") ?? "0.00",
+                            r.ActualsUptoSeptPrevYear?.ToString("0.00") ?? "0.00",
+                            r.BE?.ToString("0.00") ?? "0.00",
+                            r.ActualsUptoSept?.ToString("0.00") ?? "0.00",
+                            r.ProposedRE?.ToString("0.00") ?? "0.00",
+                            r.AddlReSought?.ToString("0.00") ?? "0.00",
+                            r.ProposedNBE?.ToString("0.00") ?? "0.00"
+                        });
+                        <tr data-row data-status="@status" data-search="@searchHaystack" data-scheme-id="@r.SchemeId" data-sub-scheme-id="@r.SubSchemeId"
+                            data-sort-scheme="@r.SchemeName" data-sort-subscheme="@r.SubSchemeName"
+                            class="group border-b border-slate-100 transition odd:bg-white even:bg-slate-50/60 hover:bg-cyan-50/60">
+                            <td class="relative px-2 py-3 text-center text-xs font-semibold text-slate-600" data-srno>@(i + 1)</td>
+                            <td data-column="scheme" class="break-words px-2 py-3 text-xs font-bold leading-5 text-slate-800">@(r.SchemeName ?? "-")</td>
+                            <td data-column="subscheme" class="break-words px-2 py-3 text-xs leading-5 text-slate-600">@r.SubSchemeName</td>
+                            <td data-column="actuals" class="tabular px-2 py-3 text-right text-xs font-semibold text-slate-800">@r.Actuals</td>
+                            <td data-column="actualsuptoseptprevyear" class="tabular px-2 py-3 text-right text-xs text-slate-600">@r.ActualsUptoSeptPrevYear</td>
+                            <td data-column="be" class="tabular px-2 py-3 text-right text-xs font-semibold text-slate-800">@r.BE</td>
+                            <td data-column="actualsuptosept" class="tabular px-2 py-3 text-right text-xs text-slate-600">@r.ActualsUptoSept</td>
+                            <td data-column="proposedre" class="tabular px-2 py-3 text-right text-xs text-slate-600">@r.ProposedRE</td>
+                            <td data-column="savingexcess" class="tabular px-2 py-3 text-right text-xs text-slate-600">@r.AddlReSought</td>
+                            <td data-column="proposednbe" class="tabular px-2 py-3 text-right text-xs font-bold text-indigo-800">@r.ProposedNBE</td>
+                            @if (Model.ShowRemarksMinistryColumn)
+                            {
+                                <td data-column="remarksministry" class="remarks-clamp-2 break-words px-2 py-3 text-xs text-slate-500" title="@r.RemarksMinistry">@r.RemarksMinistry</td>
+                            }
+                            @if (Model.ShowRemarksBudgetColumn)
+                            {
+                                <td data-column="remarksbudget" class="remarks-clamp-2 break-words px-2 py-3 text-xs text-slate-500" title="@r.RemarksBudget">@r.RemarksBudget</td>
+                            }
+                            @if (!locked)
+                            {
+                                <td class="grid-action-cell px-2 py-3 text-center">
+                                    <div class="relative inline-block">
+                                        <button type="button" class="row-menu-btn inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                                                data-action-id="@r.Id" aria-label="Actions for @r.SchemeName" aria-haspopup="true">
+                                            <i data-lucide="more-horizontal" class="h-4 w-4"></i>
+                                        </button>
+                                        <div id="ivb-menu-@r.Id" class="action-menu absolute right-0 top-9 z-20 hidden w-40 rounded-xl border border-slate-200 bg-white p-1.5 text-left shadow-xl">
+                                            <button type="button" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
+                                                    data-action="edit-appendix-ivb-record"
+                                                    data-id="@r.Id"
+                                                    data-scheme-id="@r.SchemeId"
+                                                    data-sub-scheme-id="@r.SubSchemeId"
+                                                    data-actuals="@r.Actuals"
+                                                    data-actuals-upto-sept-prev-year="@r.ActualsUptoSeptPrevYear"
+                                                    data-be="@r.BE"
+                                                    data-actuals-upto-sept="@r.ActualsUptoSept"
+                                                    data-proposed-re="@r.ProposedRE"
+                                                    data-proposed-nbe="@r.ProposedNBE"
+                                                    data-remarks-ministry="@r.RemarksMinistry"
+                                                    data-remarks-budget="@r.RemarksBudget"
+                                                    data-budget-recommended-re="@r.BudgetRecommendedRE"
+                                                    data-budget-recommended-nbe="@r.BudgetRecommendedNBE">
+                                                <i data-lucide="pencil" class="h-3.5 w-3.5"></i>Edit
+                                            </button>
+                                            <button type="button" data-action="delete-appendix-ivb-trigger" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-600 hover:bg-red-50">
+                                                <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>Delete
+                                            </button>
+                                            <form method="post" asp-action="DeleteAppendixIVB" class="hidden">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@r.Id" />
+                                                <input type="hidden" name="demandId" value="@Model.DemandId" />
+                                            </form>
+                                        </div>
+                                    </div>
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div id="ivbEmptyState" class="@(Model.Records.Count == 0 ? "" : "hidden") px-6 py-14 text-center">
+            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                <i data-lucide="search-x" class="h-5 w-5"></i>
+            </div>
+            <h4 class="mt-3 text-sm font-bold text-slate-700">No records found</h4>
+            <p class="mt-1 text-xs text-slate-500">@(Model.Records.Count == 0 ? "No records to display yet." : "Try changing your filters or search criteria.")</p>
+            @if (Model.Records.Count > 0)
+            {
+                <button type="button" data-action="clear-appendix-ivb-filters" class="mt-4 rounded-lg bg-ubis-navy px-4 py-2 text-xs font-semibold text-white">Clear Filters</button>
+            }
+        </div>
+
+        <div class="flex flex-col justify-between gap-3 border-t border-slate-100 px-5 py-3 sm:flex-row sm:items-center">
+            <div class="text-[11px] text-slate-500">
+                Showing <span id="ivbRangeText" class="font-semibold text-slate-700">@(Model.Records.Count == 0 ? "0" : "1–" + Model.Records.Count)</span> of <span id="ivbTotalText" class="font-semibold text-slate-700">@Model.Records.Count</span> records
+            </div>
+            <div class="flex items-center gap-2">
+                <label class="hidden items-center gap-2 text-[11px] text-slate-500 sm:flex">
+                    Rows:
+                    <select id="ivbPageSize" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                    </select>
+                </label>
+                <button id="ivbPrevBtn" type="button" data-action="appendix-ivb-prev-page" class="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    <i data-lucide="chevron-left" class="h-3.5 w-3.5"></i> Previous
+                </button>
+                <div id="ivbPageNumbers" class="flex items-center gap-1"></div>
+                <button id="ivbNextBtn" type="button" data-action="appendix-ivb-next-page" class="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    Next <i data-lucide="chevron-right" class="h-3.5 w-3.5"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Drawer backdrop - no data-action close here, same bug-avoidance as VI-A: only the header
+         X / footer Cancel close it, never a click-through on the dimmed backdrop. -->
+    <div id="ivbDrawerBackdrop" class="ubis-backdrop-hide fixed inset-0 z-[60] bg-slate-950/45 backdrop-blur-[2px] transition-opacity duration-300" aria-hidden="true"></div>
+
+    <!-- Right drawer - the REAL Add/Edit form (same asp-for bindings/POST action as before) -->
+    <aside id="ivbDrawer" class="ubis-drawer-closed fixed right-0 top-0 z-[70] flex h-screen w-full max-w-[820px] flex-col border-l border-indigo-100 bg-white shadow-drawer transition-transform duration-300 ease-out" aria-label="TASP expenditure form" aria-hidden="true">
+        <div class="flex shrink-0 items-center justify-between border-b border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-cyan-50 px-5 py-4">
+            <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-ubis-tealLight text-ubis-teal">
+                    <i data-lucide="file-spreadsheet" class="h-5 w-5"></i>
+                </div>
+                <div>
+                    <h2 id="ivbDrawerTitle" class="text-base font-bold text-ubis-navy">Add Record</h2>
+                    @* <p id="ivbDrawerSubtitle" class="text-[11px] text-slate-500">Create a new record</p> *@
+                    <div class="mt-1.5 flex flex-wrap items-center gap-2">
+                        <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-800">Demand No. @Model.DemandNo</span>
+                        <span class="text-[10px] font-semibold italic text-red-600">Amount in Crores of Rupees</span>
+                    </div>
+                </div>
+            </div>
+            <button type="button" data-action="close-appendix-ivb-drawer" class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-white/70 hover:text-slate-700" aria-label="Close">
+                <i data-lucide="x" class="h-4 w-4"></i>
+            </button>
+        </div>
+
+        <form method="post" autocomplete="off" asp-action="SaveAppendixIVB" id="appendixIVBForm" data-demand-id="@Model.DemandId" data-autosave-key="PreBudget-AppendixIVB-@Model.DemandId" data-selected-scheme-id="@Model.NewRecord.SchemeId" data-selected-subscheme-id="@Model.NewRecord.SubSchemeId" class="flex min-h-0 flex-1 flex-col">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="demandId" value="@Model.DemandId" />
+            <input type="hidden" name="code" value="IV-B" />
+            <input type="hidden" name="appendixId" value="@Model.AppendixId" />
+            <input type="hidden" asp-for="NewRecord.Id" />
+            <fieldset disabled="@locked" style="border:none;margin:0;padding:0;display:contents;">
+            <div class="min-h-0 flex-1 overflow-y-auto bg-slate-50/70 px-5 py-5">
+                @if (Model.IsNilSubmitted)
+                {
+                    <p class="mb-4 rounded-lg border border-teal-100 bg-ubis-tealLight px-3 py-2.5 text-sm text-slate-700">You have marked Nil Data for this Template, so data cannot be entered</p>
+                }
+                <section class="mb-4 rounded-xl border border-slate-200 bg-white">
+                    <div class="grid gap-4 p-4 md:grid-cols-2">
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Scheme Name <span class="text-red-500">*</span></label>
+                            <select class="form-field h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" asp-for="NewRecord.SchemeId" required>
+                                <option value="">Select</option>
+                                @foreach (var scheme in Model.Schemes)
+                                {
+                                    <option value="@scheme.SchemeId">@scheme.SchemeName</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Sub-Scheme</label>
+                            <select class="form-field h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" asp-for="NewRecord.SubSchemeId" disabled>
+                                <option value="">Select a Scheme first</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-4 p-4 md:grid-cols-2">
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Actual @yMinus2 <span class="text-red-500">*</span></label>
+                            <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.Actuals" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Actuals upto 9/@(yMinus2.Split('-')[0]) <span class="text-red-500">*</span></label>
+                            <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.ActualsUptoSeptPrevYear" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">B.E. @yMinus1</label>
+                            <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-slate-100 px-3 text-right text-sm font-semibold text-slate-700 outline-none cursor-not-allowed" type="number" step="0.01" min="0" required readonly asp-for="NewRecord.BE" title="Auto-loaded from SBE (sum of NBE for the selected Scheme/SubScheme)" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Actuals upto 9/@(yMinus1.Split('-')[0]) <span class="text-red-500">*</span></label>
+                            <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.ActualsUptoSept" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">R.E. @yMinus1 Proposed by Min/Dep <span class="text-red-500">*</span></label>
+                            <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.ProposedRE" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Saving/Excess in R.E. over B.E.</label>
+                            <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-slate-100 px-3 text-right text-sm font-semibold text-slate-700 outline-none cursor-not-allowed" type="text" id="ivbSavingExcess" readonly tabindex="-1" title="R.E. proposed by Min/Dep minus B.E. - calculated automatically" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">B.E. @y Proposed by Min/Dep <span class="text-red-500">*</span></label>
+                            <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.ProposedNBE" />
+                        </div>
+                    </div>
+                    <p class="px-4 pb-2 text-xs text-slate-500">Saving/Excess in R.E. over B.E. = R.E. proposed by Min/Dep &minus; B.E.</p>
+
+                    @if (Model.ShowRemarksBudgetColumn)
+                    {
+                        @* Client instruction 2026-09-21: Budget Division/ABO-DS-Director/Section User (the
+                           same roles who see the Remarks (Budget Div) column) additionally enter these two
+                           recommended figures - Ministry-side roles never see or edit them, and their own
+                           save round-trips the existing value unchanged via the hidden inputs below. *@
+                        <div class="grid gap-4 p-4 md:grid-cols-2">
+                            <div>
+                                <label class="mb-1.5 block text-xs font-semibold text-slate-700">R.E. Recommended by Budget Division</label>
+                                <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" asp-for="NewRecord.BudgetRecommendedRE" />
+                            </div>
+                            <div>
+                                <label class="mb-1.5 block text-xs font-semibold text-slate-700">B.E. Recommended by Budget Division</label>
+                                <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" asp-for="NewRecord.BudgetRecommendedNBE" />
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <input type="hidden" asp-for="NewRecord.BudgetRecommendedRE" />
+                        <input type="hidden" asp-for="NewRecord.BudgetRecommendedNBE" />
+                    }
+                    <div class="grid gap-4 p-4">
+                        @if (Model.ShowRemarksMinistryColumn)
+                        {
+                            <div>
+                                <label class="mb-1.5 block text-xs font-semibold text-slate-700">Remarks (Ministry)</label>
+                                @* Client requirement 2026-09-21: grid clamps this to 2 lines, but the edit control must
+                                   always show the complete remark - taller by default and resizable (grid clamp is
+                                   display-only, resize-none was hiding overflow text behind a scrollbar here). *@
+                                <textarea rows="4" class="RemarksText w-full resize-y rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" asp-for="NewRecord.RemarksMinistry"></textarea>
+                            </div>
+                        }
+                        else
+                        {
+                            <input type="hidden" asp-for="NewRecord.RemarksMinistry" />
+                        }
+                        @if (Model.ShowRemarksBudgetColumn)
+                        {
+                            <div>
+                                <label class="mb-1.5 block text-xs font-semibold text-slate-700">Remarks (Budget Div)</label>
+                                <textarea rows="4" class="RemarksText w-full resize-y rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" asp-for="NewRecord.RemarksBudget"></textarea>
+                            </div>
+                        }
+                        else
+                        {
+                            <input type="hidden" asp-for="NewRecord.RemarksBudget" />
+                        }
+                    </div>
+                </section>
+            </div>
+
+            <div class="flex shrink-0 items-center justify-end border-t border-slate-200 bg-white px-5 py-3.5">
+                <div class="flex items-center gap-2">
+                    <button id="appendixIVBReset" type="reset" class="h-9 rounded-lg border border-ubis-navy px-3.5 text-xs font-semibold text-ubis-navy hover:bg-blue-50">Clear</button>
+                    <button type="button" data-action="close-appendix-ivb-drawer" class="h-9 rounded-lg border border-slate-300 px-3.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                    <button type="submit" class="h-9 rounded-lg bg-ubis-teal px-4 text-xs font-bold text-white shadow-sm hover:bg-teal-700">Save Record</button>
+                    <button type="button" class="hidden" data-action="cancel-edit"></button>
+                </div>
+            </div>
+            </fieldset>
+        </form>
+    </aside>
+
+    <!-- Toast -->
+    <div id="ivbToast" class="ubis-toast-hide ubis-toast-success fixed bottom-5 right-5 z-[100] flex w-[calc(100%-2rem)] max-w-sm items-start gap-3 rounded-xl border bg-white p-4 shadow-2xl transition-all duration-300" aria-live="polite" aria-atomic="true">
+        <div class="ubis-toast-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-full">
+            <i id="ivbToastIcon" data-lucide="check-circle-2" class="h-4 w-4"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+            <p id="ivbToastTitle" class="text-xs font-bold text-slate-800">Success</p>
+            <p id="ivbToastMessage" class="mt-0.5 text-[11px] text-slate-500"></p>
+        </div>
+        <button id="ivbToastClose" type="button" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-4 focus:ring-slate-100" aria-label="Close notification"><i data-lucide="x" class="h-4 w-4"></i></button>
+    </div>
+
+    <!-- Delete confirmation dialog -->
+    <div id="ivbDeleteDialog" class="ubis-dialog-hide fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px] transition-opacity duration-200" role="dialog" aria-modal="true" aria-labelledby="ivbDeleteDialogTitle" aria-hidden="true">
+        <div class="ubis-dialog-card w-full max-w-md rounded-2xl border border-red-100 bg-white p-5 shadow-2xl transition-all duration-200">
+            <div class="flex items-start gap-4">
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                    <i data-lucide="trash-2" class="h-5 w-5"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <h2 id="ivbDeleteDialogTitle" class="text-base font-bold text-slate-900">Delete</h2>
+                    <p class="mt-1 text-sm leading-5 text-slate-500">Are you sure you want to delete?</p>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end gap-2">
+                <button id="ivbCancelDeleteBtn" type="button" class="h-10 rounded-lg border border-slate-300 px-4 text-xs font-bold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100">Cancel</button>
+                <button id="ivbConfirmDeleteBtn" type="button" class="inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-100"><i data-lucide="trash-2" class="h-4 w-4"></i>Delete record</button>
+            </div>
+        </div>
+    </div>
+</div>

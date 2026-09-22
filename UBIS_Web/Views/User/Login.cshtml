@@ -1,0 +1,199 @@
+@model LoginViewModel
+@{
+    Layout = null;
+}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#063f66">
+    <title>Login | Union Budget Information System</title>
+    <link rel="stylesheet" href="~/css/styles.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/css/login.css" asp-append-version="true">
+    <script src="~/vendor/lucide.min.js" defer></script>
+    <script src="~/css/tailwind.css" defer></script>
+</head>
+<body class="login-body">
+    <main class="login-page">
+        <aside class="visual-panel" aria-label="Indian Parliament building">
+            <img src="~/images/ph.png" alt="" class="visual-panel-image">
+        </aside>
+        <section class="form-panel" aria-label="UBIS sign in">
+            <div class="login-card">
+                <header class="identity">
+                    <div class="seal"><img src="~/images/emblem-dark.png" alt="Emblem of India"></div>
+                    <div>
+                        <p lang="hi">भारत सरकार</p>
+                        <h1>Government of India</h1>
+                    </div>
+                </header>
+                <section class="department" aria-label="Union Budget Information System">
+                    <img src="~/images/UBIS-Logo-LoginN.png" alt="Union Budget Information System">                    
+                    <div class="department-copy">
+                        <span style="font-size:17px!important; font-weight:bold; color:rgb(6 63 102/var(--tw-text-opacity,1));">Union Budget Information System</span>
+                        <strong>Department of Economic Affairs</strong>Ministry of Finance, Government of India
+                    </div>
+                </section>
+
+                <form id="loginForm" asp-controller="User" asp-action="Login" method="post" class="login-form" novalidate>
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="ReturnUrl" />
+
+                    @{
+                        var hasLoginError = !string.IsNullOrEmpty(Model.ErrorMessage);
+                    }
+                    <p id="loginFormMessage" class="@(hasLoginError ? "error" : "info")" role="@(hasLoginError ? "alert" : "status")">@(hasLoginError ? Model.ErrorMessage : Model.InfoMessage)</p>
+
+                    <div class="field">
+                        <label asp-for="UserName">Username / Email <span class="required">*</span></label>
+                        <div class="input-wrap"><input asp-for="UserName" autocomplete="username" required></div>
+                        <span asp-validation-for="UserName" class="error"></span>
+                    </div>
+
+                    <div class="field">
+                        <label asp-for="Password">Password <span class="required">*</span></label>
+                        <div class="input-wrap">
+                            <input asp-for="Password" id="password" type="password" autocomplete="current-password" maxlength="25" required>
+                            <button class="password-toggle" id="togglePassword" type="button" aria-label="Show password" title="Show password"><i data-lucide="eye" aria-hidden="true"></i></button>
+                        </div>
+                        <span asp-validation-for="Password" class="error"></span>
+                    </div>
+
+                    <div class="captcha-box">
+                        <div class="captcha-controls">
+                            <img id="captchaImage" src="@Model.CaptchaImageSvg" alt="Security code" width="160" height="60" class="captcha-image">
+                            <a href="#" id="refreshCaptcha" class="refresh" title="Get a new code"><i data-lucide="refresh-cw" size="17" aria-hidden="true"></i>Refresh</a>
+                        </div>
+                        <div class="field">
+                            <span class="captcha-title">Captcha <span class="required">*</span></span>
+                            <input asp-for="CaptchaAnswer" class="captcha-entry" autocomplete="off" placeholder="Enter the characters shown above" required>
+                            <span asp-validation-for="CaptchaAnswer" class="error"></span>
+                        </div>
+                    </div>
+
+                    <button type="button" class="forgot" id="openForgotPassword">Forgot Password?</button>
+
+                    <button class="login-submit" type="submit">Login</button>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    @* Client report 2026-09-02 ("Login page, Logging wait rotating banner got missing"): login.js's
+       setLoading() (Login submit) and its change-password flow both toggle #loginStatus's
+       "is-visible" class and write into #loginStatusMessage - this markup had gone missing from
+       this file entirely, so every one of those calls was a silent no-op (getElementById returned
+       null, guarded by "if (statusEl)"). Same shared .ubis-loading-overlay/.ubis-loading-spinner/
+       .ubis-loading-text pattern already used by _Layout.cshtml's #navLoaderOverlay and
+       Dashboard.cshtml's #dashboardStatus - restoring it here, not inventing a new one. *@
+    <div id="loginStatus" class="ubis-loading-overlay" role="status" aria-live="polite">
+        <div class="ubis-loading-spinner" aria-hidden="true"></div>
+        <p id="loginStatusMessage" class="ubis-loading-text">Signing you in&hellip;</p>
+    </div>
+
+    <div id="changePasswordDialog" class="modal-backdrop" role="presentation">
+        <section class="verify-modal" role="dialog" aria-modal="true" aria-labelledby="changePasswordTitle" aria-describedby="changePasswordDescription">
+            <header class="modal-header">
+                <div>
+                    <h2 id="changePasswordTitle">Change your password</h2>
+                    <p id="changePasswordDescription">You're signed in with the default password. Set a new password to continue.</p>
+                </div>
+            </header>
+            <form id="changePasswordForm" class="modal-body" novalidate>
+                <div class="verify-field">
+                    <label for="NewPassword">New password</label>
+                    <input id="NewPassword" name="NewPassword" type="password" autocomplete="new-password" minlength="12" required>
+                </div>
+                <div class="verify-field">
+                    <label for="ConfirmNewPassword">Confirm new password</label>
+                    <input id="ConfirmNewPassword" name="ConfirmNewPassword" type="password" autocomplete="new-password" minlength="12" required>
+                </div>
+                <p id="changePasswordError" class="error" role="alert"></p>
+                <div class="modal-actions">
+                    <button class="cancel" type="button" id="changePasswordCancel">Not now</button>
+                    <button class="confirm" type="submit">Change password</button>
+                </div>
+            </form>
+        </section>
+    </div>
+
+    @* Forgot-password dialog (added 2026-07-22) — same modal-backdrop/verify-modal visual style
+       as #changePasswordDialog above, driven entirely by forgot-password.js. Reuses the page's
+       existing anonymous antiforgery token (below) across all four steps; nothing here signs the
+       user in, so there's no post-auth token swap to worry about like the change-password dialog. *@
+    <div id="forgotPasswordDialog" class="modal-backdrop" role="presentation">
+        <section class="verify-modal" role="dialog" aria-modal="true" aria-labelledby="forgotPasswordTitle" aria-describedby="forgotPasswordDescription">
+            @Html.AntiForgeryToken()
+            <header class="modal-header">
+                <div>
+                    <h2 id="forgotPasswordTitle">Reset your password</h2>
+                    <p id="forgotPasswordDescription">Verify your identity to set a new password.</p>
+                </div>
+                <button class="close-modal" type="button" id="fpClose" aria-label="Close"><i data-lucide="x" size="19" aria-hidden="true"></i></button>
+            </header>
+            <div class="modal-body">
+                <p id="forgotPasswordError" class="error" role="alert"></p>
+                <p id="forgotPasswordInfo" class="info" role="status"></p>
+
+                <div id="fpStepUnavailable" style="display:none;">
+                    <p>Password reset by OTP is not available right now. Contact your administrator to reset your password.</p>
+                    <div class="modal-actions">
+                        <button type="button" class="cancel" id="fpCloseUnavailable">Close</button>
+                    </div>
+                </div>
+
+                <form id="fpRequestForm" novalidate style="display:none;">
+                    <div class="verify-field">
+                        <label for="fpUserName">Username / User ID</label>
+                        <input id="fpUserName" autocomplete="username" required>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="cancel" id="fpCancelRequest">Cancel</button>
+                        <button type="submit" class="confirm">Send Code</button>
+                    </div>
+                </form>
+
+                <form id="fpVerifyForm" novalidate style="display:none;">
+                    <div class="verify-field">
+                        <label for="fpOtp">Verification code</label>
+                        <input id="fpOtp" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="Enter 6-digit code" required>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="resend" id="fpResend">Resend code</button>
+                        <button type="submit" class="confirm">Verify</button>
+                    </div>
+                </form>
+
+                <form id="fpNewPasswordForm" novalidate style="display:none;">
+                    <div class="verify-field">
+                        <label for="fpNewPassword">New password</label>
+                        <input id="fpNewPassword" type="password" autocomplete="new-password" minlength="12" required>
+                    </div>
+                    <div class="verify-field">
+                        <label for="fpConfirmPassword">Confirm new password</label>
+                        <input id="fpConfirmPassword" type="password" autocomplete="new-password" minlength="12" required>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="submit" class="confirm">Change Password</button>
+                    </div>
+                </form>
+
+                <div id="fpStepSuccess" style="display:none;">
+                    <p id="fpSuccessMessage"></p>
+                    <div class="modal-actions">
+                        <button type="button" class="confirm" id="fpCloseSuccess">Back to Login</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+ 
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/login.js" asp-append-version="true"></script>
+    <script src="~/js/forgot-password.js" asp-append-version="true"></script>
+</body>
+</html>

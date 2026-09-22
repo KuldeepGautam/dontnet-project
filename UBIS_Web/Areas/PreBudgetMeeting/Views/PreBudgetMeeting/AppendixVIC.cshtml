@@ -1,0 +1,454 @@
+@model UBIS.Web.Areas.PreBudgetMeeting.Models.AppendixVICViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Appendix VI-C : Details of Corpus Funds";
+    var yMinus1 = Model.PriorFinancialYear;
+    var yMinus2 = Model.PriorPriorFinancialYear;
+    var yMinus3 = Model.YearOffset(-3);
+    var yMinus4 = Model.YearOffset(-4);
+    var balAsOnYMinus2 = yMinus2.Split('-')[0].Substring(2);
+    var balAsOnYMinus1 = yMinus1.Split('-')[0].Substring(2);
+    var expTillSeptYear = yMinus1.Split('-')[0].Substring(2);
+    var locked = Model.IsEntryLocked;
+    // Bug report 2026-09-08 ("Please match the requested format" blocking a legitimate save): a
+    // plain C# string here (where "@" needs no Razor escaping) sidesteps the same @@-before-/
+    // attribute-value corruption already found and fixed for VI-B's Remarks field - see
+    // site.js's "vic-corpus-reason" mask comment for the full root-cause explanation.
+    var corpusReasonTitle = "Up to 1000 characters. Allowed special characters: . @ / # $ % , ' ( )";
+
+    // "Approved design for all appendixes" (2026-09-08, UBIS-Pre-budget-html/Appendix6c.html) -
+    // same drawer/grid theme already shipped for Appendix VI-A, reused here with VI-C's own real
+    // fields/validation (unchanged - see AppendixVIC.cshtml's git history for the prior inline-
+    // table layout this replaces). No AJAX cascade here (Autonomous Body is a flat dropdown), so
+    // appendix-vic-drawer.js only needs to re-wire the previous-year-reference lookup at document
+    // level, not a whole Category/Scheme chain like VI-B.
+}
+
+<div class="ubis-modern-appendix">
+    <section class="appendix-highlight mb-5 rounded-2xl border p-4">
+        <div class="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
+            <div class="flex items-start gap-3">
+                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-cyan-600 text-white shadow-lg shadow-indigo-200">
+                    <i data-lucide="file-spreadsheet" class="h-6 w-6"></i>
+                </div>
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-2xl font-extrabold tracking-tight text-indigo-950">Appendix VI-C</h2>
+                        <span id="vicRecordCountBadge" class="rounded-full bg-white px-3 py-1 text-[10px] font-bold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200">@Model.Records.Count Record@(Model.Records.Count == 1 ? "" : "s")</span>
+                    @if (Model.IsAppendixFrozen)
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="freezedot"></span>Freezed
+                        </span>
+                    }
+                    else if (Model.IsNilSubmitted)
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="freezedot"></span>NIL
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="bluedot"></span>In Progress
+                        </span>
+                    }
+                    </div>
+                    <p class="mt-1.5 text-sm font-medium text-slate-600">Details of Corpus Funds</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                @* Freeze/Nil moved out of the drawer to sit next to Add, per designer markup
+                   (2026-09-08) - see AppendixVIA.cshtml's matching comment. *@
+                @if (Model.Records.Count == 0 && !locked)
+                {
+                    <button type="submit" form="appendixVICForm" formnovalidate formaction="@Url.Action("SetNilSubmission")"
+                            class="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100">
+                        Nil
+                    </button>
+                }
+                @if (Model.Records.Count > 0 && !locked)
+                {
+                    <button type="submit" form="appendixVICForm" formnovalidate formaction="@Url.Action("FreezeAppendixTemplate")"
+                            class="inline-flex h-10 items-center justify-center rounded-lg bg-orange-100 px-4 text-sm font-semibold freeze-button shadow-sm transition hover:bg-orange-200 focus:outline-none focus:ring-4 focus:ring-orange-100">
+                        Freeze Data
+                    </button>
+                }
+                @if (!locked)
+                {
+                    <button type="button" data-action="open-appendix-vic-add-drawer"
+                            class="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-ubis-navy px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-ubis-dark focus:outline-none focus:ring-4 focus:ring-blue-100">
+                        <i data-lucide="plus" class="h-4 w-4"></i>Add
+                    </button>
+                }
+            </div>
+        </div>
+    </section>
+
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="mb-4">
+            <p class="text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="status">@Model.StatusMessage</p>
+        </div>
+    }
+
+    <!-- Filter & Context -->
+        <!-- Data Grid -->
+    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
+        <div class="flex flex-col justify-between gap-3 border-b border-slate-100 px-5 py-3.5 sm:flex-row sm:items-center">
+            <div class="relative"><i data-lucide="search" class="absolute left-3 top-3 h-4 w-4 text-slate-400"></i><input id="vicSearchInput" type="search" placeholder="Search autonomous body..." class="search-control" /></div>
+            <div class="flex items-center gap-2">
+                
+                <div class="relative">
+                    <button id="vicColumnsButton" type="button"
+                            class="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="vicColumnsMenu">
+                        <i data-lucide="columns-3" class="h-3.5 w-3.5"></i> Columns
+                    </button>
+                    <div id="vicColumnsMenu" class="absolute right-0 top-10 z-30 hidden w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl" role="menu" aria-label="Choose visible columns">
+                        <div class="border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-cyan-50 px-4 py-3">
+                            <p class="text-xs font-bold text-slate-800">Visible columns</p>
+                            <p class="mt-0.5 text-[10px] text-slate-500">Choose the information shown in the table.</p>
+                        </div>
+                        <div class="space-y-1 p-2">
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="autonomous" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Autonomous Name</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="pubacc" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Public Account</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="balprev" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Accumulated Balance @yMinus2</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="bal" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Accumulated Balance @yMinus1</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="exp1" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Actual Exp. @yMinus4</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="exp2" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Actual Exp. @yMinus3</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="exp3" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Actual Exp. @yMinus2</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="allocbe" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Allocation in B.E.</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="exptillsept" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Expenditure till Sept</label>
+                        </div>
+                        <div class="border-t border-slate-100 bg-slate-50 px-3 py-2.5">
+                            <button type="button" data-action="reset-appendix-vic-columns" class="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50"><i data-lucide="rotate-ccw" class="h-3.5 w-3.5"></i>Reset columns</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="relative">
+                    <button id="vicExportButton" type="button" data-action="toggle-appendix-vic-export-menu"
+                            class="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="vicExportMenu">
+                        <i data-lucide="download" class="h-3.5 w-3.5"></i> Export
+                        <i data-lucide="chevron-down" class="h-3 w-3 text-slate-400"></i>
+                    </button>
+                    <div id="vicExportMenu" class="absolute right-0 top-10 z-30 hidden w-44 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-2xl">
+                        <button type="button" data-action="export-appendix-vic" data-format="pdf"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-rose-600">
+                            <i data-lucide="file-text" class="h-4 w-4 text-rose-500"></i>
+                            <span>PDF</span>
+                        </button>
+                        <button type="button" data-action="export-appendix-vic" data-format="excel"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-emerald-600">
+                            <i data-lucide="sheet" class="h-4 w-4 text-emerald-600"></i>
+                            <span>Excel</span>
+                        </button>
+                        <button type="button" data-action="export-appendix-vic" data-format="csv"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-blue-600">
+                            <i data-lucide="file-spreadsheet" class="h-4 w-4 text-blue-500"></i>
+                            <span>CSV</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="vicGridScroll" class="grid-scroll">
+            <span class="amtmsg">Amount in Crores of Rupees</span>
+            <table id="chargesTable" class="ubis-data-grid">
+                <thead class="ubis-data-grid__head ubis-data-grid__head--plain">
+                    <tr class="data-grid__header-row">
+                        <th class="w-[4%] px-2 py-3 text-center">S.No.</th>
+                        <th data-column="autonomous" class="w-[13%] px-2 py-3">
+                            <button type="button" data-sort-key="autonomous" class="flex items-center gap-1.5">Autonomous Name</button>
+                        </th>
+                        <th data-column="pubacc" class="w-[7%] px-2 py-3 text-center">Public Account</th>
+                        <th data-column="balprev" class="w-[9%] px-2 py-3 text-right"><button type="button" data-sort-key="balprev" class="ml-auto flex items-center gap-1">Bal. as on<br>31.03.@balAsOnYMinus2</button></th>
+                        <th data-column="bal" class="w-[9%] px-2 py-3 text-right"><button type="button" data-sort-key="bal" class="ml-auto flex items-center gap-1">Bal. as on<br>31.03.@balAsOnYMinus1</button></th>
+                        <th data-column="exp1" class="w-[8%] px-2 py-3 text-right">Actual Exp.<br>@yMinus4</th>
+                        <th data-column="exp2" class="w-[8%] px-2 py-3 text-right">Actual Exp.<br>@yMinus3</th>
+                        <th data-column="exp3" class="w-[8%] px-2 py-3 text-right">Actual Exp.<br>@yMinus2</th>
+                        <th data-column="allocbe" class="w-[8%] px-2 py-3 text-right">Alloc. in B.E.<br>@yMinus1</th>
+                        <th data-column="exptillsept" class="w-[8%] px-2 py-3 text-right">Exp. till<br>09/@expTillSeptYear</th>
+                        @if (!locked)
+                        {
+                            <th class="w-[5%] px-2 py-3 text-center">Action</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody id="gridBody" class="divide-y divide-slate-100">
+                    @for (var i = 0; i < Model.Records.Count; i++)
+                    {
+                        var r = Model.Records[i];
+                        var status = r.IsFrozen ? "Frozen" : "Active";
+                        var searchHaystack = string.Join(" ", new[] { r.Id.ToString(), r.AutonomousBodyName, status });
+                        <tr data-row data-status="@status" data-search="@searchHaystack" data-sort-autonomous="@r.AutonomousBodyName"
+                            data-sort-balprev="@r.AccumulatedBalancePrevYear" data-sort-bal="@r.AccumulatedBalance"
+                            class="group border-b border-slate-100 transition odd:bg-white even:bg-slate-50/60 hover:bg-cyan-50/60 @(r.IsFrozen ? "bg-slate-50" : "")">
+                            <td class="relative px-2 py-3 text-center text-xs font-semibold text-slate-600" data-srno>
+                                @if (r.IsFrozen)
+                                {
+                                    <span class="absolute left-0 top-0 bottom-0 w-1 bg-slate-700" title="Frozen record"></span>
+                                }
+                                @(i + 1)
+                            </td>
+                            <td data-column="autonomous" class="break-words px-2 py-3 text-xs font-bold leading-5 text-slate-800">@(r.AutonomousBodyName ?? "-")</td>
+                            <td data-column="pubacc" class="px-2 py-3 text-center text-xs text-slate-600">@(r.IsPublicAccount ? "Yes" : "No")</td>
+                            <td data-column="balprev" class="tabular px-2 py-3 text-right text-xs font-semibold text-slate-800">@(r.AccumulatedBalancePrevYear?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="bal" class="tabular px-2 py-3 text-right text-xs font-semibold text-slate-800">@(r.AccumulatedBalance?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="exp1" class="tabular px-2 py-3 text-right text-xs text-slate-700">@(r.ActualExpenditureY1?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="exp2" class="tabular px-2 py-3 text-right text-xs text-slate-700">@(r.ActualExpenditureY2?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="exp3" class="tabular px-2 py-3 text-right text-xs font-bold text-indigo-800">@(r.ActualExpenditureY3?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="allocbe" class="tabular px-2 py-3 text-right text-xs text-slate-700">@(r.AllocationInBE?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="exptillsept" class="tabular px-2 py-3 text-right text-xs text-slate-700">@(r.ExpenditureTillSept?.ToString("0.00") ?? "0.00")</td>
+                            @if (!locked)
+                            {
+                                <td class="grid-action-cell px-2 py-3 text-center">
+                                    @if (!r.IsFrozen)
+                                    {
+                                        <div class="relative inline-block">
+                                            <button type="button" class="row-menu-btn inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                                                    data-action-id="@r.Id" aria-label="Actions for @r.AutonomousBodyName" aria-haspopup="true">
+                                                <i data-lucide="more-horizontal" class="h-4 w-4"></i>
+                                            </button>
+                                            <div id="vic-menu-@r.Id" class="action-menu absolute right-0 top-9 z-20 hidden w-40 rounded-xl border border-slate-200 bg-white p-1.5 text-left shadow-xl">
+                                                <button type="button" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
+                                                        data-action="edit-appendix-vic-record"
+                                                        data-id="@r.Id"
+                                                        data-autonomous-body-id="@r.AutonomousBodyId"
+                                                        data-is-public-account="@r.IsPublicAccount.ToString().ToLowerInvariant()"
+                                                        data-accumulated-balance-prev-year="@r.AccumulatedBalancePrevYear"
+                                                        data-accumulated-balance="@r.AccumulatedBalance"
+                                                        data-actual-expenditure-y1="@r.ActualExpenditureY1"
+                                                        data-actual-expenditure-y2="@r.ActualExpenditureY2"
+                                                        data-actual-expenditure-y3="@r.ActualExpenditureY3"
+                                                        data-allocation-in-be="@r.AllocationInBE"
+                                                        data-expenditure-till-sept="@r.ExpenditureTillSept"
+                                                        data-reason-for-corpus-fund="@r.ReasonForCorpusFund">
+                                                    <i data-lucide="pencil" class="h-3.5 w-3.5"></i>Edit
+                                                </button>
+                                                <button type="button" data-action="delete-appendix-vic-trigger" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-600 hover:bg-red-50">
+                                                    <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>Delete
+                                                </button>
+                                                <form method="post" asp-action="DeleteAppendixVIC" class="hidden">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@r.Id" />
+                                                    <input type="hidden" name="demandId" value="@Model.DemandId" />
+                                                </form>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-xs font-semibold text-slate-500">Frozen</span>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div id="vicEmptyState" class="@(Model.Records.Count == 0 ? "" : "hidden") px-6 py-14 text-center">
+            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                <i data-lucide="search-x" class="h-5 w-5"></i>
+            </div>
+            <h4 class="mt-3 text-sm font-bold text-slate-700">No records found</h4>
+            <p class="mt-1 text-xs text-slate-500">@(Model.Records.Count == 0 ? "No records to display yet." : "Try changing your filters or search criteria.")</p>
+            @if (Model.Records.Count > 0)
+            {
+                <button type="button" data-action="clear-appendix-vic-filters" class="mt-4 rounded-lg bg-ubis-navy px-4 py-2 text-xs font-semibold text-white">Clear Filters</button>
+            }
+        </div>
+
+        <div class="flex flex-col justify-between gap-3 border-t border-slate-100 px-5 py-3 sm:flex-row sm:items-center">
+            <div class="text-[11px] text-slate-500">
+                Showing <span id="vicRangeText" class="font-semibold text-slate-700">@(Model.Records.Count == 0 ? "0" : "1–" + Model.Records.Count)</span> of <span id="vicTotalText" class="font-semibold text-slate-700">@Model.Records.Count</span> records
+            </div>
+            <div class="flex items-center gap-2">
+                <label class="hidden items-center gap-2 text-[11px] text-slate-500 sm:flex">
+                    Rows:
+                    <select id="vicPageSize" data-action="change-appendix-vic-page-size" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                    </select>
+                </label>
+                <button id="vicPrevBtn" type="button" data-action="appendix-vic-prev-page" class="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    <i data-lucide="chevron-left" class="h-3.5 w-3.5"></i> Previous
+                </button>
+                <div id="vicPageNumbers" class="flex items-center gap-1"></div>
+                <button id="vicNextBtn" type="button" data-action="appendix-vic-next-page" class="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    Next <i data-lucide="chevron-right" class="h-3.5 w-3.5"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Drawer backdrop - no data-action="close-appendix-vic-drawer" here, same fix already
+         proven for VI-A ("right side bar menu not close on clicking on form"). Only the header's
+         X button and the footer's Cancel button close it. -->
+    <div id="vicDrawerBackdrop" class="ubis-backdrop-hide fixed inset-0 z-[60] bg-slate-950/45 backdrop-blur-[2px] transition-opacity duration-300" aria-hidden="true"></div>
+
+    <!-- Right drawer - the REAL Add/Edit form (same asp-for bindings/POST action as before) -->
+    <aside id="vicDrawer" class="ubis-drawer-closed fixed right-0 top-0 z-[70] flex h-screen w-full max-w-[820px] flex-col border-l border-indigo-100 bg-white shadow-drawer transition-transform duration-300 ease-out" aria-label="Corpus fund form" aria-hidden="true">
+        <div class="flex shrink-0 items-center justify-between border-b border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-cyan-50 px-5 py-4">
+            <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-ubis-tealLight text-ubis-teal">
+                    <i data-lucide="file-spreadsheet" class="h-5 w-5"></i>
+                </div>
+                <div>
+                    <h2 id="vicDrawerTitle" class="text-base font-bold text-ubis-navy">Add Corpus Fund</h2>
+                    @* <p id="vicDrawerSubtitle" class="text-[11px] text-slate-500">Create a new corpus-fund record</p> *@
+                    <div class="mt-1.5 flex flex-wrap items-center gap-2">
+                        <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-800">Demand No. @Model.DemandNo</span>
+                        <span class="text-[10px] font-semibold italic text-red-600">Amount in Crores of Rupees</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <form method="post" autocomplete="off" asp-action="SaveAppendixVIC" id="appendixVICForm" data-demand-id="@Model.DemandId" data-autosave-key="PreBudget-AppendixVIC-@Model.DemandId" class="flex min-h-0 flex-1 flex-col">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="demandId" value="@Model.DemandId" />
+            <input type="hidden" name="code" value="VI-C" />
+            <input type="hidden" name="appendixId" value="@Model.AppendixId" />
+            <input type="hidden" asp-for="NewRecord.Id" />
+            <fieldset disabled="@locked" style="border:none;margin:0;padding:0;display:contents;">
+            <div class="min-h-0 flex-1 overflow-y-auto bg-slate-50/70 px-5 py-5">
+                @if (Model.IsNilSubmitted)
+                {
+                    <p class="mb-4 rounded-lg border border-teal-100 bg-ubis-tealLight px-3 py-2.5 text-sm text-slate-700">You have marked Nil Data for this Template, so data cannot be entered</p>
+                }
+                <section class="mb-4 rounded-xl border border-slate-200 bg-white">
+                    <div class="grid gap-4 p-4">
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Select Autonomous <span class="text-red-500">*</span></label>
+                            <select asp-for="NewRecord.AutonomousBodyId" required
+                                    class="form-field h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50">
+                                <option value="">Select</option>
+                                @foreach (var ab in Model.AutonomousBodies)
+                                {
+                                    <option value="@ab.AutonomousBodyId">@ab.Name</option>
+                                }
+                            </select>
+                            <p class="mt-1.5 text-[10px] text-red-600">To populate Autonomous in this list you need to add Autonomous to the master first. (RE Meeting → Autonomous Master for Appendix VI C and VI E)</p>
+                        </div>
+
+                        <div>
+                            <p class="mb-1.5 text-xs font-semibold leading-5 text-slate-700">Whether in Public Account (Y/N)</p>
+                            @* Design (Appendix6c.html) color-codes this specific Yes/No control green/red
+                               (semantic affirmative/negative), unlike VI-A's own Yes/No questions which use
+                               the shared navy .seg-active highlight - kept distinct per-group classes here
+                               rather than repurposing .seg-active's color globally and affecting VI-A. *@
+                            <div class="flex gap-2">
+                                <button type="button" data-group="vicPub" data-target="vicIsPublicAccountYes" class="seg-btn-vicpub @(Model.NewRecord.IsPublicAccount ? "bg-green-600 text-white border-green-600" : "border-gray-300 text-gray-600") rounded-lg border px-5 py-2 text-sm font-semibold shadow-sm transition-all">YES</button>
+                                <button type="button" data-group="vicPub" data-target="vicIsPublicAccountNo" class="seg-btn-vicpub @(!Model.NewRecord.IsPublicAccount ? "bg-red-600 text-white border-red-600" : "border-gray-300 text-gray-600") rounded-lg border px-5 py-2 text-sm font-semibold shadow-sm transition-all">NO</button>
+                                <input type="radio" id="vicIsPublicAccountYes" class="hidden" name="NewRecord.IsPublicAccount" value="true" checked="@(Model.NewRecord.IsPublicAccount ? "checked" : null)" />
+                                <input type="radio" id="vicIsPublicAccountNo" class="hidden" name="NewRecord.IsPublicAccount" value="false" checked="@(!Model.NewRecord.IsPublicAccount ? "checked" : null)" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-4 p-4">
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Accumulated Balances as on 31.03.@balAsOnYMinus2 <span class="text-red-500">*</span></label>
+                            <input class="form-field NumericData h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.AccumulatedBalancePrevYear" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Accumulated Balances as on 31.03.@balAsOnYMinus1 <span class="text-red-500">*</span></label>
+                            <input class="form-field NumericData h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.AccumulatedBalance" />
+                        </div>
+                    </div>
+
+                    <div class="grid pt-4 pl-3 md:grid-cols-1">
+                        <h3 class="text-sm font-bold text-slate-800">Actual Expenditure</h3>
+                    </div>
+                    <div class="grid gap-3 p-4 md:grid-cols-3">
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">@yMinus4 <span class="text-red-500">*</span></p>
+                            <div class="relative mt-2">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.ActualExpenditureY1" />
+                            </div>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">@yMinus3 <span class="text-red-500">*</span></p>
+                            <div class="relative mt-2">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.ActualExpenditureY2" />
+                            </div>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">@yMinus2 <span class="text-red-500">*</span></p>
+                            <div class="relative mt-2">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-800 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.ActualExpenditureY3" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-4 p-4">
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Allocations in BE @yMinus1 <span class="text-red-500">*</span></label>
+                            <input class="form-field NumericData h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.AllocationInBE" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Expenditure till 09/@expTillSeptYear <span class="text-red-500">*</span></label>
+                            <input class="form-field NumericData h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.ExpenditureTillSept" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Reasons for Creation of Corpus Fund</label>
+                            <input class="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" maxlength="1000" data-mask="vic-corpus-reason" title="@corpusReasonTitle" asp-for="NewRecord.ReasonForCorpusFund" />
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="flex shrink-0 items-center justify-end border-t border-slate-200 bg-white px-5 py-3.5">
+                <div class="flex items-center gap-2">
+                    <button type="reset" class="h-9 rounded-lg border border-ubis-navy px-3.5 text-xs font-semibold text-ubis-navy hover:bg-blue-50">Clear</button>
+                    <button type="button" data-action="close-appendix-vic-drawer" class="h-9 rounded-lg border border-slate-300 px-3.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                    <button type="submit" class="h-9 rounded-lg bg-ubis-teal px-4 text-xs font-bold text-white shadow-sm hover:bg-teal-700">Save Record</button>
+                    <button type="button" class="hidden" data-action="cancel-edit"></button>
+                </div>
+            </div>
+            </fieldset>
+        </form>
+    </aside>
+
+    <!-- Toast -->
+    <div id="vicToast" class="ubis-toast-hide ubis-toast-success fixed bottom-5 right-5 z-[100] flex w-[calc(100%-2rem)] max-w-sm items-start gap-3 rounded-xl border bg-white p-4 shadow-2xl transition-all duration-300" aria-live="polite" aria-atomic="true">
+        <div class="ubis-toast-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-full">
+            <i id="vicToastIcon" data-lucide="check-circle-2" class="h-4 w-4"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+            <p id="vicToastTitle" class="text-xs font-bold text-slate-800">Success</p>
+            <p id="vicToastMessage" class="mt-0.5 text-[11px] text-slate-500"></p>
+        </div>
+        <button id="vicToastClose" type="button" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-4 focus:ring-slate-100" aria-label="Close notification"><i data-lucide="x" class="h-4 w-4"></i></button>
+    </div>
+
+    <!-- Delete confirmation dialog -->
+    <div id="vicDeleteDialog" class="ubis-dialog-hide fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px] transition-opacity duration-200" role="dialog" aria-modal="true" aria-labelledby="vicDeleteDialogTitle" aria-hidden="true">
+        <div class="ubis-dialog-card w-full max-w-md rounded-2xl border border-red-100 bg-white p-5 shadow-2xl transition-all duration-200">
+            <div class="flex items-start gap-4">
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                    <i data-lucide="trash-2" class="h-5 w-5"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <h2 id="vicDeleteDialogTitle" class="text-base font-bold text-slate-900">Delete</h2>
+                    <p class="mt-1 text-sm leading-5 text-slate-500">Are you sure you want to delete?</p>
+                    <p id="vicDeleteRecordName" class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800"></p>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end gap-2">
+                <button id="vicCancelDeleteBtn" type="button" class="h-10 rounded-lg border border-slate-300 px-4 text-xs font-bold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100">Cancel</button>
+                <button id="vicConfirmDeleteBtn" type="button" class="inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-100"><i data-lucide="trash-2" class="h-4 w-4"></i>Delete record</button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>UBIS.ApiGateway</RootNamespace>
+    <AssemblyName>UBIS.ApiGateway</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Gateway is Infrastructure, not a Core business microservice — see modifications-14072026. -->
+    <PackageReference Include="Ocelot" Version="24.1.0" />
+    <PackageReference Include="Ocelot.Provider.Polly" Version="24.1.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
+    <!-- For publishing the final-failure log message to LogWriter's RabbitMQ exchange, same
+         pattern as RabbitMqLogWriterClient in Shared/UserProfile and every other service. -->
+    <PackageReference Include="RabbitMQ.Client" Version="7.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="ocelot.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="../../MicroserviceSettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>MicroserviceSettings.json</Link>
+    </None>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>UBIS.Web</RootNamespace>
+    <AssemblyName>UBIS.Web</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Redis-backed session/distributed cache -->
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.0" />
+
+    <!-- Resilient HttpClient calls to AIM/MenuGenerator -->
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="9.4.0" />
+
+    <!-- Centralized logging: publish to the same RabbitMQ "log" exchange as AIM/MenuGenerator -->
+    <PackageReference Include="RabbitMQ.Client" Version="7.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Tools/MenuScaffolder is its own standalone console project (own .csproj); exclude
+         it from this project's default globs so its Program.cs doesn't collide with ours. -->
+    <Compile Remove="Tools\**\*.cs" />
+    <Content Remove="Tools\**\*" />
+    <None Remove="Tools\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="wwwroot\css\login.css">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

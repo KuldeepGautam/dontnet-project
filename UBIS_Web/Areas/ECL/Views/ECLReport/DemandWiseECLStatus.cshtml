@@ -1,0 +1,9 @@
+@model UBIS.Web.Areas.ECL.Models.EclReportViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Demand Wise ECL Status";
+}
+<partial name="_EclReportGrid" model="Model" />
+
+@section Scripts {
+    <script src="~/js/ecl.js" asp-append-version="true"></script>
+}

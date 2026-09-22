@@ -1,0 +1,65 @@
+﻿{
+    "_comment":  "Central, single-source-of-truth microservice locations. Consumed at startup by Gateway/UBIS.ApiGateway/MicroserviceSettingsLoader.cs, which overrides ocelot.json\u0027s DownstreamHostAndPorts per route. This is the ONLY file a developer machine should edit to point the Gateway at different service addresses - do not hand-edit ocelot.json\u0027s DownstreamHostAndPorts directly, it will be overwritten by this file at startup. Regenerate/update via Gateway/UBIS.ApiGateway/Configure-Gateway.ps1.",
+    "Microservices":  [
+                          {
+                              "Name":  "AIM",
+                              "IpAddress":  "172.18.160.1",
+                              "Port":  5000,
+                              "Status":  "Shared IIS deployment"
+                          },
+                          {
+                              "Name":  "MenuGenerator",
+                              "IpAddress":  "172.18.160.1",
+                              "Port":  5001,
+                              "Status":  "Shared IIS deployment"
+                          },
+                          {
+                              "Name":  "Email",
+                              "IpAddress":  "172.18.160.1",
+                              "Port":  5004,
+                              "Status":  "Shared IIS deployment (renumbered from 5141 to the Core-service 500x block, 2026-08-20)"
+                          },
+                          {
+                              "Name":  "LogWriter",
+                              "IpAddress":  "172.18.160.1",
+                              "Port":  5002,
+                              "Status":  "Shared IIS deployment"
+                          },
+                          {
+                              "Name":  "UserProfile",
+                              "IpAddress":  "172.18.160.1",
+                              "Port":  5104,
+                              "Status":  "Shared IIS deployment"
+                          },
+                          {
+                              "Name":  "UBIS_Web",
+                              "IpAddress":  "172.18.160.1",
+                              "Port":  80,
+                              "Status":  "Shared IIS deployment - rebound to port 80 2026-08-10 so dev/tester machines can reach it externally (was 127.0.0.1:5100, loopback-only, unreachable off-box)"
+                          },
+                          {
+                              "Name":  "ReferenceData",
+                              "IpAddress":  "172.18.160.1",
+                              "Port":  5105,
+                              "Status":  "Shared IIS deployment"
+                          },
+                          {
+                              "Name":  "PreBudget",
+                              "IpAddress":  "172.18.160.1",
+                              "Port":  5010,
+                              "Status":  "Shared IIS deployment"
+                          },
+                          {
+                              "Name":  "ECL",
+                              "IpAddress":  "172.18.160.1",
+                              "Port":  5011,
+                              "Status":  "Shared IIS deployment (added 2026-08-18)"
+                          },
+                          {
+                              "Name":  "Gateway",
+                              "IpAddress":  "172.18.160.1",
+                              "Port":  5150,
+                              "Status":  "Shared IIS deployment"
+                          }
+                      ]
+}

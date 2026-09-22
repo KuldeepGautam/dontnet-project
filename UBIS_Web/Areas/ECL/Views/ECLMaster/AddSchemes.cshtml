@@ -1,0 +1,93 @@
+@model UBIS.Web.Areas.ECL.Models.EclSchemeMasterViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Add Schemes";
+}
+
+<section class="panel overflow-hidden p-0 animate-fade-in">
+    <div class="heading text-center heading-bg justify-between items-center border rounded px-4 py-3 text-white">
+        Add Scheme Name
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="px-5 pt-4">
+            <p class="text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="status">@Model.StatusMessage</p>
+        </div>
+    }
+
+    <form method="post" asp-action="AddSchemes" autocomplete="off"
+          data-autosave-key="ECL-AddSchemes-@Model.SelectedDemandId" class="flex flex-col gap-4 border-b border-slate-200 p-5 dark:border-slate-800">
+        @Html.AntiForgeryToken()
+
+        <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
+            <label class="table-toolbar-field">
+                <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Demand Name</span>
+                <select id="demandSelect" name="demandId" class="input truncate" data-umbrella-schemes-url="@Url.Action("GetUmbrellaSchemes")">
+                    <option value="">Select</option>
+                    @foreach (var d in Model.Demands)
+                    {
+                        <option value="@d.DemandId" selected="@(d.DemandId == Model.SelectedDemandId)">@d.DemandNo-@d.DemandName</option>
+                    }
+                </select>
+            </label>
+
+            <label class="table-toolbar-field">
+                <span>Select Category</span>
+                <select id="categorySelect" name="categoryId" class="input truncate">
+                    <option value="">Select</option>
+                    @foreach (var c in Model.Categories)
+                    {
+                        <option value="@c.CategoryId" selected="@(c.CategoryId == Model.SelectedCategoryId)">@c.SerialNo - @c.CategoryName</option>
+                    }
+                </select>
+            </label>
+        </div>
+
+        <div id="umbrellaRow" class="hidden grid w-full grid-cols-1 gap-4 lg:grid-cols-2 items-center">
+            <div class="flex flex-col gap-1">
+                <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Is This Scheme Under Umbrella Scheme</span>
+                <div class="flex items-center gap-6 mt-1.5">
+                    <label class="inline-flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+                        <input type="radio" name="isUmbrella" value="Y" class="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500"> Yes
+                    </label>
+                    <label class="inline-flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+                        <input type="radio" name="isUmbrella" value="N" class="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500"> No
+                    </label>
+                </div>
+            </div>
+
+            <div id="umbrellaDropdownContainer" class="invisible">
+                <label class="table-toolbar-field mb-0">
+                    <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Select Umbrella Scheme</span>
+                    <select id="umbrellaSchemeSelect" name="umbrellaSchemeId" class="input truncate">
+                        <option value="">--Select Umbrella Scheme--</option>
+                        @foreach (var u in Model.UmbrellaSchemeOptions)
+                        {
+                            <option value="@u.UmbSchemeId">@u.UmSchemeName</option>
+                        }
+                    </select>
+                </label>
+            </div>
+        </div>
+
+        <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
+            <label class="table-toolbar-field">
+                <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Scheme Name (English)</span>
+                <input type="text" required name="schemeNameEnglish" class="input" placeholder="Scheme Name in English" />
+            </label>
+            <label class="table-toolbar-field">
+                <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Scheme Name (Hindi)</span>
+                <input type="text" required name="schemeNameHindi" class="input" placeholder="Scheme Name in Hindi" />
+            </label>
+        </div>
+
+        <div class="mt-4 flex justify-center gap-3">
+            <button type="submit" class="btn-primary">Submit</button>
+            <button type="reset" class="btn-secondary">Reset</button>
+        </div>
+    </form>
+</section>
+
+@section Scripts {
+    <script src="~/js/ecl.js" asp-append-version="true"></script>
+}

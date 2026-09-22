@@ -1,0 +1,9 @@
+// Reference only — JSON with comments is NOT valid to actually send as the
+// request body (Postman/the API will fail to parse it). Use this to see what
+// each field means, then copy the clean body from SaveUsersDev.postman_collection.json.
+{
+  "username": "jdoe",          // becomes M_Users.UserName — must be unique
+  "password": "P@ssw0rd",      // sent as plain text; API hashes it with BCrypt (factor 12) before storing
+  "email_address": "jdoe@test.com", // becomes M_Users.EmailAddress
+  "role_name": "Admin"         // looked up in M_Role.RoleName; 400 "Role not found" if it doesn't exist
+}

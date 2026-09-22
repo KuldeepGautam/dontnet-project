@@ -1,0 +1,131 @@
+@model UBIS.Web.Areas.ECL.Models.EclApprovalGridViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Data For Reapproval";
+}
+
+<section class="panel overflow-hidden p-0 animate-fade-in">
+    <div class="heading text-center heading-bg justify-between items-center border rounded px-4 py-3 text-white">
+        @Model.Title
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        @* Same fix as DataToApprove.cshtml - only mark this role="status" (which triggers ecl.js's
+           save-result dialog) when the message actually came from the Reapprove POST action, not a
+           plain GET load failure. *@
+        <div class="px-5 pt-4">
+            <p class="text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="@(Model.IsSaveResult ? "status" : null)">@Model.StatusMessage</p>
+        </div>
+    }
+
+    <div class="flex flex-col gap-5 p-5">
+        <form method="get" asp-action="DataForReapproval" class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2" data-auto-submit-filters>
+            <label class="table-toolbar-field">
+                <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Demand Name</span>
+                @* "All" removed (same reasoning/change as DataToApprove, 2026-08-27) - an unfiltered
+                   query returns every outlay row across every demand the caller can see. The
+                   controller defaults SelectedDemandId to the first entry here whenever none is on
+                   the query string, so this select's initial "selected" option always matches what's
+                   actually loaded. *@
+                <select name="demandId" class="input truncate">
+                    @foreach (var d in Model.Demands)
+                    {
+                        <option value="@d.DemandId" selected="@(d.DemandId == Model.SelectedDemandId)">@d.DemandNo-@d.DemandName</option>
+                    }
+                </select>
+            </label>
+            @* Financial Year fixed to the logged-in user's current financial year (same change as
+               DataToApprove, 2026-08-27) - no longer user-selectable here. *@
+            <div class="table-toolbar-field">
+                <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Financial Year</span>
+                <div class="input flex items-center bg-slate-100 dark:bg-slate-800">@Model.FinancialYear</div>
+            </div>
+        </form>
+
+        <div class="text-right text-red-600 font-medium text-xs md:text-sm italic">Amount in Crores of Rupees</div>
+
+        <div class="overflow-x-auto rounded-lg border border-slate-200 shadow-sm">
+            <table id="dataForReapprovalTable" class="w-full border-collapse text-center text-xs">
+                @* Scheme widened / per-year columns narrowed (same change as DataToApprove,
+                   2026-08-27) - Scheme is the one free-text column, years only ever hold a short
+                   right-aligned amount. *@
+                <colgroup>
+                    <col style="width:3%" />
+                    <col style="width:6%" />
+                    <col style="width:27%" />
+                    <col style="width:7%" />
+                    <col style="width:7%" />
+                    @{ var yearColWidth = Model.OutlayYearColumns.Count > 0 ? 30.0 / Model.OutlayYearColumns.Count : 0; }
+                    @for (var i = 0; i < Model.OutlayYearColumns.Count; i++)
+                    {
+                        <col style="width:@(yearColWidth.ToString("0.##"))%" />
+                    }
+                    <col style="width:12%" />
+                    <col style="width:8%" />
+                </colgroup>
+                <thead class="bg-slate-100 font-bold uppercase tracking-wider text-slate-700">
+                    <tr>
+                        <th class="border-b border-r border-slate-200 p-2.5">Sr.No.</th>
+                        <th class="border-b border-r border-slate-200 p-2.5">Financial Year</th>
+                        <th class="border-b border-r border-slate-200 p-2.5">Scheme</th>
+                        <th class="border-b border-r border-slate-200 p-2.5">Total Outlay</th>
+                        <th class="border-b border-r border-slate-200 p-2.5">Central Share</th>
+                        @foreach (var y in Model.OutlayYearColumns)
+                        {
+                            <th class="border-b border-r border-slate-200 p-2.5">@y</th>
+                        }
+                        <th class="border-b border-r border-slate-200 p-2.5">Status</th>
+                        <th class="border-b border-slate-200 p-2.5">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 text-slate-700">
+                    @if (Model.Rows.Count == 0)
+                    {
+                        <tr><td colspan="@(8 + Model.OutlayYearColumns.Count)" class="empty-state-cell">No approved rows to re-approve.</td></tr>
+                    }
+                    else
+                    {
+                        var sr = 1;
+                        @foreach (var row in Model.Rows)
+                        {
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="border-r border-slate-200 p-2 font-medium">@(sr++)</td>
+                                <td class="border-r border-slate-200 p-2">@row.FinancialYear</td>
+                                <td class="border-r border-slate-200 p-2 text-left font-semibold text-slate-800">@(!string.IsNullOrEmpty(row.SchemeName) ? $"{row.SchemeSrNo ?? 0} - {row.SchemeName}" : $"Scheme #{row.SchemeId}")</td>
+                                <td class="border-r border-slate-200 p-2 text-right font-medium">@row.TotalOutlay?.ToString("N2")</td>
+                                <td class="border-r border-slate-200 p-2 text-right font-medium">@row.CentralShare?.ToString("N2")</td>
+                                @foreach (var v in row.Outlay)
+                                {
+                                    <td class="border-r border-slate-200 p-2 text-right">@(v?.ToString("N2") ?? "0.00")</td>
+                                }
+                                <td class="border-r border-slate-200 p-2">
+                                    @if (row.IsReapprovalCase)
+                                    {
+                                        <span class="inline-block rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold uppercase px-2 py-1">Re-approval Requested</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="inline-block rounded-full bg-green-100 text-green-800 text-[10px] font-bold uppercase px-2 py-1">@row.DoeApprovalStatusDisplay</span>
+                                    }
+                                </td>
+                                <td class="p-2 whitespace-nowrap">
+                                    <form method="post" asp-action="Reapprove" class="inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="rowId" value="@row.RowId" />
+                                        <input type="hidden" name="demandId" value="@Model.SelectedDemandId" />
+                                        <input type="hidden" name="financialYear" value="@Model.FinancialYear" />
+                                        <button type="submit" class="btn-primary text-xs py-1 px-2" disabled="@(row.IsReapprovalCase)">Reapprove</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+@section Scripts {
+    <script src="~/js/ecl.js" asp-append-version="true"></script>
+}

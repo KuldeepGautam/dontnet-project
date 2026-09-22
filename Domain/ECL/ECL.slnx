@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Domain/ECL.Domain.csproj" />
+  <Project Path="Application/ECL.Application.csproj" />
+  <Project Path="Infrastructure/ECL.Infrastructure.csproj" />
+  <Project Path="WebApi/ECL.WebApi.csproj" />
+</Solution>

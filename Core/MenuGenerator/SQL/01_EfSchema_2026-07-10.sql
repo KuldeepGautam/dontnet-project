@@ -1,0 +1,5 @@
+-- This script previously created a fictional "dbo.M_App" table (invented in error — no such
+-- table exists or should exist). Corrected 2026-07-16 against the DBA's UBIS_RBAC.xlsx: the real
+-- table is the pre-existing legacy "App_Name" (same status as M_Role/M_Module/M_Function/
+-- M_RoleModuleMapping/M_RoleFunctionMapping — read-only, owned by the DBA, not by this script).
+-- This script creates nothing. See SQL/README.md for the corrected history.

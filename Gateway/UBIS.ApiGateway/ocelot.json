@@ -1,0 +1,188 @@
+{
+  "Routes": [
+    {
+      "_comment": "AuthenticationController is [AllowAnonymous] at the class level, no per-action override, for all 11 actions (login, verify-otp, resend-otp, refresh, change-password, change-default-password, forgot-password, reset-password, validate-reset-token, logout, financial-years) — confirmed by reading the controller directly, not assumed.",
+      "_XServiceName": "AIM",
+      "DownstreamPathTemplate": "/api/authentication/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "127.0.0.1", "Port": 5000 } ],
+      "UpstreamPathTemplate": "/aim/api/authentication/{everything}",
+      "UpstreamHttpMethod": [ "Get", "Post", "Put", "Delete", "Patch" ],
+      "RateLimitOptions": { "EnableRateLimiting": true, "Period": "1s", "PeriodTimespan": 1, "Limit": 25 },
+      "QoSOptions": { "ExceptionsAllowedBeforeBreaking": 5, "DurationOfBreak": 5000, "TimeoutValue": 10000 }
+    },
+    {
+      "_comment": "Added 2026-08-20 (found missing during live debugging - UBIS_Web's IAimClient.GetAppSettingsAsync was 404ing through the Gateway even though AIM itself served /api/app-settings fine directly). AppSettingsController is [AllowAnonymous] at the class level — confirmed by reading the controller; protected by CallerRestrictionMiddleware instead, same as MenuController.GetByRole below.",
+      "_XServiceName": "AIM",
+      "DownstreamPathTemplate": "/api/app-settings",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "127.0.0.1", "Port": 5000 } ],
+      "UpstreamPathTemplate": "/aim/api/app-settings",
+      "UpstreamHttpMethod": [ "Get" ],
+      "RateLimitOptions": { "EnableRateLimiting": true, "Period": "1s", "PeriodTimespan": 1, "Limit": 25 },
+      "QoSOptions": { "ExceptionsAllowedBeforeBreaking": 5, "DurationOfBreak": 5000, "TimeoutValue": 10000 }
+    },
+    {
+      "_comment": "UserRoleController.GetMyRole has its own [Authorize] — confirmed by reading the controller. Listed before the userrole catch-all route since Ocelot matches more specific templates first.",
+      "_XServiceName": "AIM",
+      "DownstreamPathTemplate": "/api/userrole/my-role",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "127.0.0.1", "Port": 5000 } ],
+      "UpstreamPathTemplate": "/aim/api/userrole/my-role",
+      "UpstreamHttpMethod": [ "Get" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] },
+      "RateLimitOptions": { "EnableRateLimiting": true, "Period": "1s", "PeriodTimespan": 1, "Limit": 25 },
+      "QoSOptions": { "ExceptionsAllowedBeforeBreaking": 5, "DurationOfBreak": 5000, "TimeoutValue": 10000 }
+    },
+    {
+      "_comment": "UserRoleController.CheckPermission has its own [Authorize] — confirmed by reading the controller.",
+      "_XServiceName": "AIM",
+      "DownstreamPathTemplate": "/api/userrole/check-permission",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "127.0.0.1", "Port": 5000 } ],
+      "UpstreamPathTemplate": "/aim/api/userrole/check-permission",
+      "UpstreamHttpMethod": [ "Get" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] },
+      "RateLimitOptions": { "EnableRateLimiting": true, "Period": "1s", "PeriodTimespan": 1, "Limit": 25 },
+      "QoSOptions": { "ExceptionsAllowedBeforeBreaking": 5, "DurationOfBreak": 5000, "TimeoutValue": 10000 }
+    },
+    {
+      "_comment": "Everything else under userrole/* (all-roles, {userId}/role, roles/{roleId}, roles/{roleId}/functions) has no [Authorize] anywhere — confirmed by reading the controller, not a simplification. Known-open surface, same as it is calling AIM directly today; not something this gateway change makes more or less open.",
+      "_XServiceName": "AIM",
+      "DownstreamPathTemplate": "/api/userrole/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "127.0.0.1", "Port": 5000 } ],
+      "UpstreamPathTemplate": "/aim/api/userrole/{everything}",
+      "UpstreamHttpMethod": [ "Get", "Post", "Put", "Delete", "Patch" ],
+      "RateLimitOptions": { "EnableRateLimiting": true, "Period": "1s", "PeriodTimespan": 1, "Limit": 25 },
+      "QoSOptions": { "ExceptionsAllowedBeforeBreaking": 5, "DurationOfBreak": 5000, "TimeoutValue": 10000 }
+    },
+    {
+      "_comment": "Every action under api/users/* (split across UserLookupController and ComplianceController) is [Authorize] — confirmed action-by-action by reading both controllers; no anonymous action exists anywhere in this path.",
+      "_XServiceName": "AIM",
+      "DownstreamPathTemplate": "/api/users/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "127.0.0.1", "Port": 5000 } ],
+      "UpstreamPathTemplate": "/aim/api/users/{everything}",
+      "UpstreamHttpMethod": [ "Get", "Post", "Put", "Delete", "Patch" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] },
+      "RateLimitOptions": { "EnableRateLimiting": true, "Period": "1s", "PeriodTimespan": 1, "Limit": 25 },
+      "QoSOptions": { "ExceptionsAllowedBeforeBreaking": 5, "DurationOfBreak": 5000, "TimeoutValue": 10000 }
+    },
+    {
+      "_comment": "MenuController.GetByRole is explicitly [AllowAnonymous] (internal-tooling endpoint, protected by CallerRestrictionMiddleware instead) — confirmed by reading the controller.",
+      "_XServiceName": "MenuGenerator",
+      "DownstreamPathTemplate": "/api/menu/by-role",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "127.0.0.1", "Port": 5001 } ],
+      "UpstreamPathTemplate": "/menu/api/menu/by-role",
+      "UpstreamHttpMethod": [ "Get" ],
+      "RateLimitOptions": { "EnableRateLimiting": true, "Period": "1s", "PeriodTimespan": 1, "Limit": 25 },
+      "QoSOptions": { "ExceptionsAllowedBeforeBreaking": 5, "DurationOfBreak": 5000, "TimeoutValue": 10000 }
+    },
+    {
+      "_comment": "MenuController.GetFull requires [Authorize] via the class-level attribute (no per-action override) — confirmed by reading the controller. Catch-all also covers any future action added to this controller with a safe (auth-required) default.",
+      "_XServiceName": "MenuGenerator",
+      "DownstreamPathTemplate": "/api/menu/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "127.0.0.1", "Port": 5001 } ],
+      "UpstreamPathTemplate": "/menu/api/menu/{everything}",
+      "UpstreamHttpMethod": [ "Get", "Post", "Put", "Delete", "Patch" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] },
+      "RateLimitOptions": { "EnableRateLimiting": true, "Period": "1s", "PeriodTimespan": 1, "Limit": 25 },
+      "QoSOptions": { "ExceptionsAllowedBeforeBreaking": 5, "DurationOfBreak": 5000, "TimeoutValue": 10000 }
+    },
+    {
+      "_comment": "Email has zero REST controllers (confirmed — pure RabbitMQ consumer, no *Controller.cs anywhere in the project). This route is currently vestigial/unreachable; kept for when a real HTTP surface (e.g. /health) is added, with a safe (auth-required) default.",
+      "_XServiceName": "Email",
+      "DownstreamPathTemplate": "/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5004 } ],
+      "UpstreamPathTemplate": "/email/{everything}",
+      "UpstreamHttpMethod": [ "Get", "Post", "Put", "Delete", "Patch" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] },
+      "RateLimitOptions": { "EnableRateLimiting": true, "Period": "1s", "PeriodTimespan": 1, "Limit": 25 },
+      "QoSOptions": { "ExceptionsAllowedBeforeBreaking": 5, "DurationOfBreak": 5000, "TimeoutValue": 10000 }
+    },
+    {
+      "_comment": "LogController has no [Authorize]/[AllowAnonymous] at all — LogWriter doesn't validate JWTs (confirmed, no AddJwtBearer in its Program.cs); its only protection is CallerRestrictionMiddleware's shared-secret header, which the Gateway forwards (see Program.cs). No AuthenticationOptions here deliberately — there's no JWT concept on this service to check.",
+      "_XServiceName": "LogWriter",
+      "DownstreamPathTemplate": "/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "127.0.0.1", "Port": 5002 } ],
+      "UpstreamPathTemplate": "/logwriter/{everything}",
+      "UpstreamHttpMethod": [ "Get", "Post", "Put", "Delete", "Patch" ],
+      "RateLimitOptions": { "EnableRateLimiting": true, "Period": "1s", "PeriodTimespan": 1, "Limit": 25 },
+      "QoSOptions": { "ExceptionsAllowedBeforeBreaking": 5, "DurationOfBreak": 5000, "TimeoutValue": 10000 }
+    },
+    {
+      "_comment": "New 2026-07-23. Every controller in ReferenceData (SchemesController/MajorHeadsController/ObjectHeadsController) is [Authorize] at the class level, no anonymous actions — confirmed by reading them (built alongside this route).",
+      "_XServiceName": "ReferenceData",
+      "DownstreamPathTemplate": "/api/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "127.0.0.1", "Port": 5105 } ],
+      "UpstreamPathTemplate": "/referencedata/api/{everything}",
+      "UpstreamHttpMethod": [ "Get", "Post", "Put", "Delete", "Patch" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] },
+      "RateLimitOptions": { "EnableRateLimiting": true, "Period": "1s", "PeriodTimespan": 1, "Limit": 25 },
+      "QoSOptions": { "ExceptionsAllowedBeforeBreaking": 5, "DurationOfBreak": 5000, "TimeoutValue": 10000 }
+    },
+    {
+      "_comment": "New 2026-07-23. Every controller in PreBudget (AppendicesController/AutonomousBodiesController/RemarksController/AppendixIController/AppendixIIController/AppendixIIIAController) is [Authorize] at the class level, no anonymous actions — confirmed by reading them (built alongside this route). Only 3 of the 22 appendix-data controllers exist so far (I, II, III-A) — the remaining 19 follow the identical AppendixDataRepository<T> pattern and will land under this same route prefix.",
+      "_XServiceName": "PreBudget",
+      "DownstreamPathTemplate": "/api/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "127.0.0.1", "Port": 5010 } ],
+      "UpstreamPathTemplate": "/prebudget/api/{everything}",
+      "UpstreamHttpMethod": [ "Get", "Post", "Put", "Delete", "Patch" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] },
+      "RateLimitOptions": { "EnableRateLimiting": true, "Period": "1s", "PeriodTimespan": 1, "Limit": 25 },
+      "QoSOptions": { "ExceptionsAllowedBeforeBreaking": 5, "DurationOfBreak": 5000, "TimeoutValue": 10000 }
+    },
+    {
+      "_comment": "New 2026-08-18. Both controllers in ECL (EclOutlayController/EclApprovalController) are [Authorize] at the class level, no anonymous actions — confirmed by reading them. EclApprovalController's approve/reject/reapproval-grant actions additionally check the caller's RoleId against DoeRoleOptions.DoeRoleIds server-side, independent of this gateway's own Bearer check.",
+      "_XServiceName": "ECL",
+      "DownstreamPathTemplate": "/api/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "127.0.0.1", "Port": 5011 } ],
+      "UpstreamPathTemplate": "/ecl/api/{everything}",
+      "UpstreamHttpMethod": [ "Get", "Post", "Put", "Delete", "Patch" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] },
+      "RateLimitOptions": { "EnableRateLimiting": true, "Period": "1s", "PeriodTimespan": 1, "Limit": 25 },
+      "QoSOptions": { "ExceptionsAllowedBeforeBreaking": 5, "DurationOfBreak": 5000, "TimeoutValue": 10000 }
+    },
+    {
+      "_comment": "New 2026-08-25 (Foundation stage — no controllers with real actions yet, /health is the only endpoint). SBE (Domain/SBE) is the Statement of Budget Estimates module; role gating for actions restricted to one of its 3 FRS roles (Ministry/Budget Division/ABO-DS-Director) is enforced server-side via RequireSbeRoleFilter, independent of this gateway's own Bearer check.",
+      "_XServiceName": "SBE",
+      "DownstreamPathTemplate": "/api/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "127.0.0.1", "Port": 5013 } ],
+      "UpstreamPathTemplate": "/sbe/api/{everything}",
+      "UpstreamHttpMethod": [ "Get", "Post", "Put", "Delete", "Patch" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] },
+      "RateLimitOptions": { "EnableRateLimiting": true, "Period": "1s", "PeriodTimespan": 1, "Limit": 25 },
+      "QoSOptions": { "ExceptionsAllowedBeforeBreaking": 5, "DurationOfBreak": 5000, "TimeoutValue": 10000 }
+    },
+    {
+      "_comment": "New 2026-08-20. Reporting (Core/Reporting) is a stateless PDF/Excel export service reused across any future consumer page — ReportsController is [Authorize] at the class level, no anonymous actions, no domain-specific knowledge of ECL/PreBudget/etc.",
+      "_XServiceName": "Reporting",
+      "DownstreamPathTemplate": "/api/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "127.0.0.1", "Port": 5003 } ],
+      "UpstreamPathTemplate": "/reporting/api/{everything}",
+      "UpstreamHttpMethod": [ "Get", "Post", "Put", "Delete", "Patch" ],
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] },
+      "RateLimitOptions": { "EnableRateLimiting": true, "Period": "1s", "PeriodTimespan": 1, "Limit": 25 },
+      "QoSOptions": { "ExceptionsAllowedBeforeBreaking": 5, "DurationOfBreak": 5000, "TimeoutValue": 10000 }
+    }
+  ],
+  "GlobalConfiguration": {
+    "BaseUrl": "http://localhost:5150",
+    "RateLimitOptions": {
+      "DisableRateLimitHeaders": false,
+      "QuotaExceededMessage": "Rate limit exceeded (25 requests/second). Try again shortly.",
+      "HttpStatusCode": 429,
+      "ClientIdHeader": "ClientId"
+    }
+  }
+}

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>UBIS.Services.Reporting.Domain</RootNamespace>
+    <AssemblyName>Reporting.Domain</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- No external project references per Clean Architecture specification -->
+    <!-- Domain layer contains only core business rules, entities, and value objects -->
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,298 @@
+# Page Scaffolding + Route Migration Plan (2026-07-21)
+
+**Status: COMPLETE.** Phase 1 (page scaffolding), Phase 2 (Ocelot gateway), the
+`AddressOfTheFunction` backfill, and the `UBIS_Web` → Gateway cutover have all been executed and
+verified end-to-end. See §6 for the final completion record; sections below are kept as-written
+(the original plan) for audit trail.
+
+## 1. The problem, confirmed
+
+Clicking almost any sidebar menu item 404s — e.g. `https://localhost:44379/REMeeting/REDataandReport?area=REMeeting`.
+Root cause confirmed directly (not assumed): `UBIS_Web/Areas/` currently has **zero**
+`*Controller.cs` files anywhere. The menu (AIM roles + MenuGenerator tree, both real/live) already
+correctly computes 771 distinct pages across 14 Areas — see `PAGE_INVENTORY_2026-07-21.md` for the
+full list — but none of the MVC routes those links point to exist yet.
+
+## 2. The tool for this already exists — `Tools/MenuScaffolder`
+
+This isn't a new build. `UBIS_Web/Tools/MenuScaffolder/Program.cs` already does exactly what's
+being asked:
+
+- Calls AIM `GET /api/userrole/all-roles`, then MenuGenerator `GET /api/menu/by-role?roleName=`
+  per role (the `[AllowAnonymous]` endpoint meant for tooling, gated by `CallerRestrictionMiddleware`
+  instead of a user session).
+- Unions every distinct `(AreaSlug, ControllerSlug, ActionSlug)` across all 18 roles.
+- For each Area/Controller pair, writes `Areas/{Area}/Controllers/{Controller}Controller.cs` with
+  one action per Function.
+- For each action, writes a starter Razor view at
+  `Areas/{Area}/Views/{Controller}/{Action}.cshtml`.
+- **Already produces exactly the shape asked for**: the controller sets
+  `ViewData["Title"]`/`ViewData["Breadcrumb"]`; the shared `_Layout.cshtml` (which every
+  scaffolded view inherits via the auto-generated `_ViewStart.cshtml`) renders the header and the
+  sidebar menu (`@await Component.InvokeAsync("SidebarMenu")`) around it; the view body itself is
+  just a placeholder card ("This data-entry page is pending design..."). Heading + menu come from
+  the shared layout/partial; the page body is intentionally blank. No changes needed to get this
+  shape — it's already how the tool works.
+- **Idempotent and non-destructive**: never overwrites an existing view; only appends new actions
+  to an existing controller if the `// SCAFFOLD:APPEND-ACTIONS-ABOVE-THIS-LINE` marker is still
+  present. Safe to re-run after this plan is approved, and safe to re-run again later as new
+  Functions are added.
+
+### Running it (Phase 1 — when approved)
+
+```
+cd UBIS_Web/Tools/MenuScaffolder
+dotnet run -- --aim-url http://172.18.160.1:5000 --menu-url http://172.18.160.1:5001 --output ../../
+```
+
+`--internal-key` can be omitted while `SecurityConfiguration:IsDevelopmentTime` stays `true` on
+the real MenuGenerator deployment (confirmed still the case — `CallerRestrictionMiddleware` is
+skipped entirely in that mode). Expected result per the counts already gathered: 14 new Area
+folders, ~100 new controllers, 771 new placeholder views, one build, done in one run.
+
+**Open question for you before Phase 1 runs**: `[Authorize]` is on every scaffolded controller
+by default (matches the tool's existing template). Confirm that's correct for all 771 pages, or
+flag any that should be `[AllowAnonymous]` — none obviously should be, since these all sit behind
+the authenticated menu, but worth a explicit yes given the volume.
+
+## 3. `AddressOfTheFunction` (legacy .aspx) → new route mapping
+
+`dbo.M_Function.AddressOfTheFunction` holds the old WebForms path for all 707 real functions
+(e.g. `~/UBIS/Admin/RoleMaster.aspx`) — confirmed via direct query, 707/707 rows populated, no
+gaps. **Important finding: this column is not read anywhere in the new system.**
+`MenuGenerator.MenuService.BuildTree` computes each Function's `AreaSlug`/`ControllerSlug`/
+`ActionSlug` (and therefore its URL) purely by slugifying `AppName`/`ModuleName`/`FunctionName` —
+zero dependency on `AddressOfTheFunction` (confirmed in `UBIS_Web/CLAUDE.md`'s own description of
+`MenuService.BuildTree`). So updating this column is **not required for routing to work** —
+Phase 1 produces working links regardless.
+
+What updating it *would* be for for: a durable, queryable audit trail mapping every old BIMS page
+to its new UBIS_Web equivalent — useful for anyone cross-referencing the legacy system, but not a
+functional dependency.
+
+**Decision needed from you**: do you want this column updated for that audit-trail purpose? If
+yes, the mechanism is straightforward and already fully determined (no ambiguity to resolve):
+
+- MenuGenerator's `GET /api/menu/by-role` response already includes `FunctionId` on every leaf
+  (confirmed: `MenuFunctionDto(int FunctionId, string FunctionName, string ActionSlug, string Url)`
+  in `Tools/MenuScaffolder/Dtos.cs`) — so the new route can be joined back to the exact
+  `M_Function` row by `FunctionId` directly, no name-matching/fuzzy-join needed.
+- New value would be the MVC route equivalent, e.g. `/REMeeting/REMeeting/REDataandReport`
+  (Area/Controller/Action), replacing `~/UBIS/.../REDataandReport.aspx`.
+- This would be a real data UPDATE across 707 rows — same category of action as the
+  `M_AppName`/`M_Function.Active` fixes earlier, so it'd go through the same
+  confirm-before-writing approach, as its own follow-up step after Phase 1 (need the *new* routes
+  to exist and be confirmed correct first, before writing them back as the "current" address).
+
+## 4. Ocelot Gateway — Phase 2 implementation plan (2026-07-21, expanded)
+
+Goal confirmed with you directly: once done, `UBIS_Web` (and any other caller) talks to one
+address — the gateway — instead of a separate address per microservice, and
+`MicroserviceSettings.json` becomes the one file every developer machine edits when a service's
+location changes.
+
+Current real state, verified from the actual files (not assumed):
+- `Gateway/UBIS.ApiGateway/Program.cs` already does `builder.Configuration.AddJsonFile("ocelot.json", ...)`
+  then `builder.Services.AddOcelot(builder.Configuration).AddPolly()` — Ocelot binds its routing
+  config from whatever's in `builder.Configuration` at that point, standard ASP.NET Core config
+  layering (later-added sources override earlier ones for the same key).
+- `Program.cs` **already has JWT Bearer authentication wired up** (same SecretKey/Issuer/Audience
+  as AIM), with an existing code comment flagging it's "not yet wired into per-route
+  AuthenticationOptions in ocelot.json" — this was already anticipated, just not finished.
+- `ocelot.json` currently has 4 routes (`/aim`, `/menu`, `/email`, `/logwriter`), hardcoded
+  `DownstreamHostAndPorts`, `GlobalConfiguration.BaseUrl` already `http://localhost:5150`.
+- `MicroserviceSettings.json` (repo root, created 2026-07-21) is the target source of truth but is
+  not read by anything yet.
+
+### Step-by-step
+
+1. **Gateway's own IIS deployment** — same pattern as AIM/MenuGenerator: dedicated site + app
+   pool, bound to `172.18.160.1:5150`, Windows-integrated SQL auth isn't relevant here (Gateway
+   has no DB of its own) so no app-pool-identity SQL grant needed for this one. File-system
+   publish profile, same as the other two, so it's not vulnerable to the earlier Web-Deploy
+   cross-contamination issue.
+
+2. **Load `MicroserviceSettings.json` and use it to override `DownstreamHostAndPorts`** —
+   mechanism (grounded in the actual `AddOcelot(builder.Configuration)` call above): read
+   `MicroserviceSettings.json`, build an in-memory key/value overlay shaped like Ocelot's own
+   config paths (`Routes:{index}:DownstreamHostAndPorts:0:Host` / `:Port`), and add it via
+   `builder.Configuration.AddInMemoryCollection(...)` **after** `AddJsonFile("ocelot.json", ...)`
+   but **before** `AddOcelot(builder.Configuration)` reads it — last-added source wins for the
+   same key, so this cleanly overrides just the host/port values while everything else in
+   `ocelot.json` (upstream templates, HTTP methods) stays as-is. Needs each `ocelot.json` route
+   correlated to a `MicroserviceSettings.json` entry by name — since `ocelot.json` routes don't
+   currently carry a name/identifier, add one (Ocelot ignores unknown keys, so a plain
+   `"ServiceName": "AIM"` per route is safe to add for this correlation, not a routing-behavior
+   change).
+
+3. **Forward the internal-caller header** — AIM/MenuGenerator's `CallerRestrictionMiddleware`
+   expects `X-UBIS-Internal-Client-Key` on every request; today `UBIS_Web` sends it directly. Once
+   the Gateway is the caller, it needs to add that header to every downstream request itself.
+   Ocelot's documented mechanism for this is a global `DelegatingHandler`
+   (`services.AddOcelot().AddDelegatingHandler<T>(global: true)`) — needs confirming against the
+   installed Ocelot 24.1.0 API during implementation (not asserting exact syntax here since it
+   wasn't directly verified against this version), but the mechanism itself (a handler that runs
+   on every proxied request, adding the header before it goes downstream) is the right shape.
+   Simplest alternative if that API doesn't fit cleanly: add the header value as a static
+   `DownstreamHeaderTransform`-style default per route if Ocelot's config supports it, or fall
+   back to keeping `IsDevelopmentTime: true` on the downstream services (current state) so this
+   check stays inert — a decision point to confirm with you before writing this specific piece.
+
+4. **Per-route JWT authentication *and* authorization at the gateway** (optional hardening, the
+   half-finished piece the existing code comment already flags) — add
+   `"AuthenticationOptions": { "AuthenticationProviderKey": "Bearer" }` to routes that should
+   reject an invalid/missing token before ever reaching AIM/MenuGenerator. Needs the route-by-route
+   audit the comment mentions: `/aim/api/authentication/login` and
+   `/aim/api/authentication/login/verify-otp` etc. must stay reachable without a token (that's how
+   you get the token in the first place); everything else under `/aim` and all of `/menu` should
+   require one. For authorization specifically (not just "is there a valid token" but "is this
+   caller allowed to hit this route"), Ocelot supports `"RouteClaimsRequirement"` per route,
+   matching against JWT claims — e.g. requiring the `RoleId` claim for admin-only AIM endpoints
+   like the change-request approval routes. This is additive defense-in-depth — downstream
+   `[Authorize]` on AIM/MenuGenerator's own controllers already enforces this regardless, so
+   getting this step wrong fails closed (extra 401/403s), not open.
+
+5. **Rate limiting — 25 requests/second, confirmed with you** — Ocelot's per-route
+   `"RateLimitOptions"`:
+   ```json
+   "RateLimitOptions": {
+     "EnableRateLimiting": true,
+     "Period": "1s",
+     "PeriodTimespan": 1,
+     "Limit": 25
+   }
+   ```
+   applied per route (so `/aim/*` and `/menu/*` each get their own 25/sec ceiling, not a shared
+   pool) plus `GlobalConfiguration.RateLimitOptions` for the HTTP status code/message returned once
+   exceeded (`QuotaExceededMessage`, `HttpStatusCode` — Ocelot defaults to 429). Exact key names to
+   confirm against the installed Ocelot 24.1.0 version during implementation (this is Ocelot's
+   long-documented shape but worth a direct check before relying on it), same caveat as the header
+   forwarding below.
+
+6. **Retry + circuit breaker, failing to a LogWriter message after 5 retries** — two layers:
+   - *Retry/circuit breaker itself*: Ocelot's QoS config (already possible — `Ocelot.Provider.Polly`
+     is referenced and `.AddPolly()` is already called in `Program.cs`, just not configured per
+     route yet) via `"QoSOptions"` per route:
+     ```json
+     "QoSOptions": {
+       "ExceptionsAllowedBeforeBreaking": 5,
+       "DurationOfBreak": 5000,
+       "TimeoutValue": 10000
+     }
+     ```
+     matching the same "5 retries then circuit-break" shape `UBIS_Web`'s own `AimClient`/`MenuClient`
+     already use today (`NFR_ARCHITECTURE.md` §2) — same policy, now also enforced at the gateway
+     layer for any caller, not just UBIS_Web.
+   - *Logging the final failure to LogWriter*: Ocelot's QoS/Polly integration handles the
+     retry/circuit-breaker mechanics automatically, but has no built-in hook to publish anywhere on
+     final failure — that needs a small piece of Gateway-side code. Rather than inventing a new
+     logging path, this should reuse the **exact existing pattern** already used consistently
+     across every other service in this solution (`Shared/UserProfile/Infrastructure/Logging/RabbitMqLogWriterClient.cs`
+     is the reference implementation, and `AIM`/`MenuGenerator`/`Email` all have their own copy of
+     the same shape): publish a `LogEntryMessage` (`Id`, `Level`, `Message`, `Exception`,
+     `Properties`, `CreatedAt`) to the `log` topic exchange with routing key `log.error`, tagged
+     `"UBIS.ApiGateway - Error - ..."` the same way UserProfile tags itself
+     `"UserProfile Microservice - {Level} - ..."`. LogWriter already binds `log.*` (wildcard), so
+     no LogWriter-side change is needed — it'll pick up Gateway-originated errors automatically the
+     moment the Gateway starts publishing them. Needs a small `RabbitMqLogWriterClient` port into
+     `Gateway/UBIS.ApiGateway` (same interface shape, new project, same RabbitMQ connection config
+     pattern) plus a hook into Ocelot's failure path — likely a custom `DelegatingHandler`
+     (see step 7 below, same mechanism, can share one handler for both header-injection and
+     failure-logging) that catches the exception once Polly's retry+circuit-breaker have both given
+     up, matching `AimClient.SendAsync`'s existing "retries exhausted, log via LogWriter, return a
+     graceful failure instead of throwing" shape from `UBIS_Web` today.
+
+7. **Forward the internal-caller header** — AIM/MenuGenerator's `CallerRestrictionMiddleware`
+   expects `X-UBIS-Internal-Client-Key` on every request; today `UBIS_Web` sends it directly. Once
+   the Gateway is the caller, it needs to add that header to every downstream request itself.
+   Ocelot's documented mechanism for this is a global `DelegatingHandler`
+   (`services.AddOcelot().AddDelegatingHandler<T>(global: true)`) — needs confirming against the
+   installed Ocelot 24.1.0 API during implementation (not asserting exact syntax here since it
+   wasn't directly verified against this version), but the mechanism itself (a handler that runs
+   on every proxied request, adding the header before it goes downstream) is the right shape, and
+   is the same handler mechanism step 6's failure-logging would hook into.
+   Simplest alternative if that API doesn't fit cleanly: add the header value as a static
+   `DownstreamHeaderTransform`-style default per route if Ocelot's config supports it, or fall
+   back to keeping `IsDevelopmentTime: true` on the downstream services (current state) so this
+   check stays inert — a decision point to confirm with you before writing this specific piece.
+
+8. **Switch `UBIS_Web`'s `MicroserviceUrls`** to route through the gateway:
+   ```json
+   "MicroserviceUrls": {
+     "Aim": "http://172.18.160.1:5150/aim",
+     "MenuGenerator": "http://172.18.160.1:5150/menu"
+   }
+   ```
+   Do this **last**, after steps 1-7 are verified working by calling the gateway directly (e.g.
+   `http://172.18.160.1:5150/aim/api/authentication/login`) — keeps the currently-working direct
+   config as a fallback until the gateway path is proven, per "should not break this running code."
+
+9. **`Tools/MenuScaffolder`** currently takes `--aim-url`/`--menu-url` as direct addresses (used in
+   §2 above) — decide whether it should also go through the gateway once this is live, or keep
+   using direct addresses as an internal-tooling exception (it already bypasses
+   `CallerRestrictionMiddleware`'s normal path via the `by-role` endpoint's own header check, so
+   direct-address is arguably the more consistent choice for it specifically — flagging for your
+   call, not assuming).
+
+### Rollback safety
+
+Nothing above removes or replaces the current direct-address routes — steps 1-7 stand up the
+gateway path *alongside* the working direct one. Step 8 is the only cutover moment, and it's a
+one-line config change per service that's trivially reversible (revert `MicroserviceUrls` back to
+the direct addresses) if anything's wrong.
+
+## 5. What happens when you approve this
+
+1. Confirm the `[Authorize]` default (§2) and the `AddressOfTheFunction` decision (§3).
+2. Run `MenuScaffolder` (Phase 1) — generates all 771 placeholder pages, verified buildable.
+3. (If approved) backfill `AddressOfTheFunction` for the 707 real functions (§3).
+4. Build Ocelot Phase 2 per the step-by-step above (§4) — rate limiting (25/sec, confirmed) and
+   circuit-breaker thresholds (5, confirmed) are locked in; still need your call on the JWT
+   per-route audit (step 4) and the exact header-forwarding/failure-logging handler API (steps 6-7)
+   before those specific pieces get written, since both have a real "which exact API/which routes"
+   decision worth getting right rather than guessed.
+
+## 6. Completion record (2026-07-21)
+
+All items above were executed under the user's explicit "assume yes, proceed autonomously"
+authorization. Final state, each verified against the running system (not assumed):
+
+- **Phase 1 (scaffolding)**: 93 controllers / 799 views generated by `Tools/MenuScaffolder`, one
+  real bug found and fixed at the source (`MenuService.Slugify` didn't guard against a slug
+  starting with a digit — fixed by prepending `_`). Build succeeds 0 errors. Spot-checked a
+  previously-404ing route (`/REMeeting/REMeeting/REDataandReport`) — now 200. `[Authorize]` on all
+  771 scaffolded pages, per the user's explicit "no exceptions" answer.
+- **`AddressOfTheFunction` backfill (§3)**: 510/707 `dbo.M_Function` rows updated with real
+  Area/Controller/Action routes, joined by `FunctionId` from live menu-tree data. The remaining
+  197 rows aren't reachable via any of the 18 roles' menus, so no live route exists to backfill
+  them with — left untouched with their legacy `.aspx` values, reported rather than silently
+  glossed over.
+- **Phase 2 (Ocelot gateway, §4)**: all 9 steps done. `ocelot.json` has 9 routes (AIM ×5,
+  MenuGenerator ×2, Email ×1, LogWriter ×1), each audited action-by-action against AIM's/
+  MenuGenerator's real `[Authorize]`/`[AllowAnonymous]` attributes (see each route's `_comment`).
+  JWT Bearer auth wired per-route; rate limiting 25 req/sec per route; QoS (5-retry circuit
+  breaker) per route; `GatewayForwardingHandler` adds the internal-caller header and publishes a
+  `log.error` LogEntryMessage to LogWriter via RabbitMQ on final failure (confirmed via live test:
+  LogWriter stopped → ~4.2s of internal retries → 502 → exactly one failure log published).
+  `MicroserviceSettingsLoader` reads `MicroserviceSettings.json` and overrides `ocelot.json`'s
+  `DownstreamHostAndPorts` at startup, correlated by a custom `_XServiceName` field (not
+  `ServiceName` — that's a reserved Ocelot key that triggers service-discovery code paths, found
+  the hard way). Gateway bound to `0.0.0.0:5150` (not just `localhost`) so it's reachable at its
+  real `172.18.160.1:5150` address, confirmed via a live request from outside the process.
+  §4 step 9 (should `MenuScaffolder` itself go through the gateway) was left as direct-address —
+  it already bypasses `CallerRestrictionMiddleware`'s normal path, so direct-address is the more
+  consistent choice for an internal tool; nothing to change.
+- **`UBIS_Web` cutover (§4 step 8)**: `MicroserviceUrls:Aim`/`MenuGenerator` now point at
+  `http://172.18.160.1:5150/aim/` and `.../menu/` (trailing slash required — a bare
+  `http://host/aim` `HttpClient.BaseAddress` combined with a leading-slash-free relative URI like
+  `"api/authentication/login"` silently drops the `/aim` segment per .NET's `Uri` combination
+  rules; found via a live 404 during verification, fixed at the source). Verified end-to-end with
+  a real login: `financial-years` (anonymous), `login`, `my-role`, and `menu/full` all confirmed
+  routed through `172.18.160.1:5150/aim/...` and `.../menu/...` and returning 200 — login succeeds,
+  Dashboard loads, the sidebar menu partial renders real menu data (15.5KB) fetched via
+  MenuGenerator through the gateway.
+
+**Left running**: the Gateway (`UBIS.ApiGateway.exe`, dev `dotnet run` on `0.0.0.0:5150`) — kept up
+since `UBIS_Web` now depends on it for every AIM/MenuGenerator call. The ad hoc `UBIS_Web` test
+instance used for this verification was stopped afterward (not meant to stay running as a
+permanent dev instance).

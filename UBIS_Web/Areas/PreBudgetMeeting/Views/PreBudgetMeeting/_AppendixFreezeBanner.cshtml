@@ -1,0 +1,30 @@
+@model UBIS.Web.Areas.PreBudgetMeeting.Models.AppendixBaseViewModel
+@*
+    Template-level freeze/target-date-expiry banner (client review 2026-08-05, items 2/3/8).
+    Distinct from _AppendixPermissionAlert (role-based permission), and from any row-level "frozen"
+    flag an individual appendix's own records may separately carry (e.g. Appendix III's per-record
+    freeze) - this is the Demand+Appendix+FY-level template freeze from dbo.PreBudgetSubmissionStatus.
+*@
+@if (Model.IsAppendixFrozen)
+{
+    <div class="mx-5 mt-4 rounded border p-4 text-sm" style="background-color:#fef2f2;border-color:#fecaca;color:#991b1b" role="alert">
+        The template is freezed. No further changes can be made for this Demand and Financial Year.
+    </div>
+}
+else if (Model.IsTargetDateExpired)
+{
+    @* Client requirement 2026-08-31: "if target date crosses for the demand and appendix
+       combination, that appendix will automatically freezed by showing message on Appendix
+       page: The Appendix is freezed as Target Date is Over." Entry was already blocked in this
+       case (IsEntryLocked already includes IsTargetDateExpired, set by REMeetingAllocation's own
+       Target Date - see AppendixBaseViewModel's doc comments) - this was only the wrong wording. *@
+    <div class="mx-5 mt-4 rounded border p-4 text-sm" style="background-color:#fef2f2;border-color:#fecaca;color:#991b1b" role="alert">
+        The Appendix is freezed as Target Date is Over.
+    </div>
+}
+else if (Model.IsNilSubmitted)
+{
+    <div class="mx-5 mt-4 rounded border p-4 text-sm" style="background-color:#fffbeb;border-color:#fde68a;color:#92400e" role="alert">
+        This appendix has been marked Nil for this Demand and Financial Year. You can contact the concerned department.
+    </div>
+}

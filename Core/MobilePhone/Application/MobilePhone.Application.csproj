@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>UBIS.Services.MobilePhone.Application</RootNamespace>
+    <AssemblyName>MobilePhone.Application</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Application layer depends only on Domain -->
+    <ProjectReference Include="..\Domain\MobilePhone.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- External NuGet dependencies for application services -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+
+</Project>

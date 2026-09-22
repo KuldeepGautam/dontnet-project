@@ -1,0 +1,189 @@
+﻿@model UBIS.Web.Areas.PreBudgetMeeting.Models.AppendixPAViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Template for providing information on Public account for inclusion in Budget Estimates";
+    var yMinus2 = Model.PriorPriorFinancialYear;
+    var yMinus1 = Model.PriorFinancialYear;
+    var y = Model.FinancialYear;
+    var locked = Model.IsEntryLocked;
+}
+
+<section class="p-0 animate-fade-in">
+    <div class="heading text-center heading-bg justify-between items-center border rounded px-4 py-3 text-white">
+        Template for providing information on Public account for inclusion in Budget Estimates
+    </div>
+    <div class="flex flex-col gap-3 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between dark:border-slate-800">
+        <span class="text-red-600 text-xs text-right ml-auto">Amount in Crores of Rupees</span>
+    </div>
+
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="px-5 pt-4">
+            <p class="text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="status">@Model.StatusMessage</p>
+        </div>
+    }
+
+    @await Html.PartialAsync("_AppendixPermissionAlert", Model)
+
+    <form method="post" autocomplete="off" asp-action="SaveAppendixPA" id="appendixPAForm" data-demand-id="@Model.DemandId" data-autosave-key="PreBudget-AppendixPA-@Model.DemandId">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="demandId" value="@Model.DemandId" />
+        <input type="hidden" name="code" value="PA-ReceiptPayment" />
+        <input type="hidden" asp-for="NewRecord.Id" />
+        <fieldset disabled="@(Model.HasEntryPermission && !locked ? null : "disabled")">
+        <div class="p-5 pb-0">
+            <div class="mb-3" style="max-width:320px">
+                <label class="text-sm font-medium block mb-1">Select MajorHead</label>
+                <select class="input" required asp-for="NewRecord.MajorHeadId">
+                    <option value="">----Select----</option>
+                    @foreach (var mh in Model.MajorHeads)
+                    {
+                        <option value="@mh.MajorHeadId">@mh.MajorHeadName</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="overflow-x-auto p-5 pt-0">
+            <table class="demo-table min-w-full text-sm">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Actual @yMinus2</th>
+                        <th>Balance at the end of @yMinus2</th>
+                        <th>B.E. @yMinus1</th>
+                        <th>Adjustment upto first week of Sep @(yMinus1.Split('-')[0])</th>
+                        <th>R.E. @yMinus1</th>
+                        <th>B.E. @y</th>
+                        <th>Remarks</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="font-semibold">Receipts</td>
+                        <td><input class="input row-inline-inputsm NumericData" type="number" step="0.01" min="0" required asp-for="NewRecord.ActualReceipt" /></td>
+                        <td><input class="input row-inline-inputsm NumericData" type="number" step="0.01" min="0" required asp-for="NewRecord.BalanceAtEndReceipt" /></td>
+                        <td><input class="input row-inline-inputsm NumericData" type="number" step="0.01" min="0" required asp-for="NewRecord.BEReceipt" /></td>
+                        <td><input class="input row-inline-inputsm NumericData" type="number" step="0.01" min="0" required asp-for="NewRecord.AdjustmentReceipt" /></td>
+                        <td><input class="input row-inline-inputsm NumericData" type="number" step="0.01" min="0" required asp-for="NewRecord.REReceipt" /></td>
+                        <td><input class="input row-inline-inputsm NumericData" type="number" step="0.01" min="0" required asp-for="NewRecord.NBEReceipt" /></td>
+                        <td><input class="input row-inline-inputsm RemarksText" asp-for="NewRecord.RemarksReceipt" /></td>
+                    </tr>
+                    <tr>
+                        <td class="font-semibold">Payments</td>
+                        <td><input class="input row-inline-inputsm NumericData" type="number" step="0.01" min="0" required asp-for="NewRecord.ActualPayment" /></td>
+                        <td><input class="input row-inline-inputsm NumericData" type="number" step="0.01" min="0" required asp-for="NewRecord.BalanceAtEndPayment" /></td>
+                        <td><input class="input row-inline-inputsm NumericData" type="number" step="0.01" min="0" required asp-for="NewRecord.BEPayment" /></td>
+                        <td><input class="input row-inline-inputsm NumericData" type="number" step="0.01" min="0" required asp-for="NewRecord.AdjustmentPayment" /></td>
+                        <td><input class="input row-inline-inputsm NumericData" type="number" step="0.01" min="0" required asp-for="NewRecord.REPayment" /></td>
+                        <td><input class="input row-inline-inputsm NumericData" type="number" step="0.01" min="0" required asp-for="NewRecord.NBEPayment" /></td>
+                        <td><input class="input row-inline-inputsm RemarksText" asp-for="NewRecord.RemarksPayment" /></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        </fieldset>
+        <div class="mt-4 mb-5 flex flex-wrap justify-center gap-3">
+            <fieldset disabled="@(Model.HasEntryPermission && !locked ? null : "disabled")" style="display:contents;">
+                <button type="submit" class="btn-primary">Submit</button>
+                <button type="reset" class="btn-secondary">Reset</button>
+            </fieldset>
+            @if (!Model.IsAppendixFrozen)
+            {
+                <button type="submit" formnovalidate formaction="@Url.Action("FreezeAppendixTemplate")" class="btn-warning">Freeze Data</button>
+            }
+        </div>
+    </form>
+
+    <div class="overflow-x-auto p-5">
+        <table class="demo-table min-w-full text-sm">
+            <thead>
+                <tr>
+                    <th class="SrNo">S.No.</th>
+                    <th>Major Head</th>
+                    <th>Actual @yMinus2 Rcpt</th><th>Actual @yMinus2 Pmt</th>
+                    <th>Balance End @yMinus2 Rcpt</th><th>Balance End @yMinus2 Pmt</th>
+                    <th>B.E. @yMinus1 Rcpt</th><th>B.E. @yMinus1 Pmt</th>
+                    <th>Adj Rcpt</th><th>Adj Pmt</th>
+                    <th>R.E. @yMinus1 Rcpt</th><th>R.E. @yMinus1 Pmt</th>
+                    <th>B.E. @y Rcpt</th><th>B.E. @y Pmt</th>
+                    <th>Remarks Rcpt</th><th>Remarks Pmt</th>
+                    @if (!locked)
+                    {
+                        <th>Actions</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Records.Count == 0)
+                {
+                    <tr><td colspan="17" class="empty-state-cell">No records to display.</td></tr>
+                }
+                else
+                {
+                    for (var i = 0; i < Model.Records.Count; i++)
+                    {
+                        var r = Model.Records[i];
+                        <tr class="@(r.IsFrozen ? "opacity-70" : "")">
+                            <td class="SrNo">@(i + 1)</td>
+                            <td>@{ var pamh = Model.MajorHeads.FirstOrDefault(mh => mh.MajorHeadId == r.MajorHeadId); }@(pamh?.MajorHeadName ?? r.MajorHeadId.ToString())</td>
+                            <td class="NumericData">@r.ActualReceipt</td>
+                            <td class="NumericData">@r.ActualPayment</td>
+                            <td class="NumericData">@r.BalanceAtEndReceipt</td>
+                            <td class="NumericData">@r.BalanceAtEndPayment</td>
+                            <td class="NumericData">@r.BEReceipt</td>
+                            <td class="NumericData">@r.BEPayment</td>
+                            <td class="NumericData">@r.AdjustmentReceipt</td>
+                            <td class="NumericData">@r.AdjustmentPayment</td>
+                            <td class="NumericData">@r.REReceipt</td>
+                            <td class="NumericData">@r.REPayment</td>
+                            <td class="NumericData">@r.NBEReceipt</td>
+                            <td class="NumericData">@r.NBEPayment</td>
+                            <td>@r.RemarksReceipt</td>
+                            <td>@r.RemarksPayment</td>
+                            @if (!locked)
+                            {
+                                <td>
+                                @if (!r.IsFrozen)
+                                {
+                                    <div class="flex gap-2">
+                                        <button type="button" class="table-icon-btn table-action-neutral" title="Edit"
+                                                data-action="edit-appendix-pa-record"
+                                                data-id="@r.Id"
+                                                data-major-head-id="@r.MajorHeadId"
+                                                data-actual-receipt="@r.ActualReceipt"
+                                                data-actual-payment="@r.ActualPayment"
+                                                data-balance-at-end-receipt="@r.BalanceAtEndReceipt"
+                                                data-balance-at-end-payment="@r.BalanceAtEndPayment"
+                                                data-be-receipt="@r.BEReceipt"
+                                                data-be-payment="@r.BEPayment"
+                                                data-adjustment-receipt="@r.AdjustmentReceipt"
+                                                data-adjustment-payment="@r.AdjustmentPayment"
+                                                data-re-receipt="@r.REReceipt"
+                                                data-re-payment="@r.REPayment"
+                                                data-nbe-receipt="@r.NBEReceipt"
+                                                data-nbe-payment="@r.NBEPayment"
+                                                data-remarks-receipt="@r.RemarksReceipt"
+                                                data-remarks-payment="@r.RemarksPayment">
+                                            <i data-lucide="pencil"></i>
+                                        </button>
+                                        <form method="post" asp-action="DeleteAppendixPA" data-confirm="Delete this record? This cannot be undone.">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@r.Id" />
+                                            <input type="hidden" name="demandId" value="@Model.DemandId" />
+                                            <button type="submit" class="table-icon-btn table-action-danger" title="Delete"><i data-lucide="trash-2"></i></button>
+                                        </form>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="text-xs font-semibold text-slate-500">Frozen</span>
+                                }
+                                </td>
+                            }
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</section>

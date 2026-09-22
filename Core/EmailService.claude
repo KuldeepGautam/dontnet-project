@@ -1,0 +1,138 @@
+# EmailService — Standalone Microservice Build Instructions
+
+**Status:** New, independent build. This is a brand-new solution — there is no existing code to extend.
+**How to use this file:** Place this file as `.claude` (or hand it directly as the system/first prompt) inside a **new, empty folder you create yourself**, separate from the AIM/UBIS 2.0 repository. Tell Claude Code to build the full solution described below from scratch in that folder.
+**Relationship to AIM:** EmailService is consumed by the AIM module of UBIS 2.0, but this build does **not** need access to AIM's source code. The only thing that matters is the integration contract in §2 — build against that contract and nothing else.
+
+---
+
+## 1. Solution Layout
+
+Same layered convention as AIM (Domain / Application / Infrastructure / WebApi), intentionally thin:
+
+```text
+/EmailService
+  ├── EmailService.sln
+  ├── /Domain
+  │     └── /Entities            (EmailDispatchLog)
+  ├── /Application
+  │     ├── /Interfaces           (IEmailSender)
+  │     └── /DTOs                 (SendOtpEmailRequest, SendOtpEmailResult)
+  ├── /Infrastructure
+  │     ├── /Smtp                 (SmtpEmailSender : IEmailSender)
+  │     └── /Messaging             (RabbitMqOtpEmailConsumer)
+  └── /WebApi
+        ├── /Controllers           (EmailController — internal-only, network-restricted)
+        └── Program.cs
+```
+
+Target stack: .NET 9 (or match whatever .NET version the rest of UBIS 2.0 is standardized on at build time — confirm before assuming .NET 10), ASP.NET Core minimal hosting, no MVC views needed (this is an internal API only).
+
+---
+
+## 2. Integration Contract (what AIM sends you — build to this exactly)
+
+Two integration options exist upstream — build **both** so AIM can pick either at deploy time, unless told otherwise:
+
+### 2.1 Option A — RabbitMQ consumer (recommended, primary path)
+
+- Queue: `email.otp.send`
+- Message payload (JSON) EmailService will receive:
+```json
+{
+  "messageId": "guid",
+  "toEmail": "user@ministry.gov.in",
+  "toName": "Full Name",
+  "otp": "123456",
+  "purpose": "LoginMfa | PasswordSetup | PasswordReset",
+  "expiryMinutes": 5,
+  "requestedAtUtc": "2026-07-06T10:00:00Z"
+}
+```
+- EmailService consumes this queue, sends SMTP mail, writes an `EmailDispatchLog` row (Sent/Failed + provider response). Never call back to AIM synchronously — this is fire-and-forget from the caller's side.
+
+### 2.2 Option B — direct REST (fallback, simpler)
+
+- `POST /internal/email/send-otp` — same JSON body as above.
+- Restrict to internal network / mTLS only (do not expose publicly).
+- Returns `202 Accepted` immediately; actual send happens async server-side.
+
+---
+
+## 3. `SendOtpEmail` Action (Application layer)
+
+```csharp
+// Application/Interfaces/IEmailSender.cs
+public interface IEmailSender
+{
+    Task<Result> SendOtpEmailAsync(SendOtpEmailRequest request, CancellationToken ct);
+}
+```
+
+Behavior:
+- Render a fixed HTML template; subject varies by `purpose`:
+  - `LoginMfa` → "Your UBIS 2.0 Login OTP"
+  - `PasswordSetup` → "Set Up Your New Password — OTP"
+  - `PasswordReset` → "Reset Your Password — OTP"
+- Template shows the OTP, the expiry in minutes, and a static "do not share this OTP" warning. No links, no attachments.
+- On send, insert `EmailDispatchLog { MessageId, ToEmail (masked in logs, e.g. us***@domain.com), Purpose, Status, ProviderResponseCode, SentAtUtc }`.
+- **Critical:** the raw OTP must never be written to `EmailDispatchLog`, application logs, or tracing spans — only whether the send succeeded.
+
+---
+
+## 4. `EmailDispatchLog` Entity
+
+```csharp
+// Domain/Entities/EmailDispatchLog.cs
+public class EmailDispatchLog
+{
+    public Guid Id { get; set; }
+    public Guid MessageId { get; set; }
+    public string ToEmailMasked { get; set; }   // us***@domain.com — never store the full address in logs
+    public string Purpose { get; set; }         // LoginMfa | PasswordSetup | PasswordReset
+    public string Status { get; set; }          // Sent | Failed
+    public string? ProviderResponseCode { get; set; }
+    public DateTime SentAtUtc { get; set; }
+}
+```
+
+Persist this to whichever store is simplest for a thin service — SQL Server table (`emailservice.EmailDispatchLog`) if a database is already provisioned for this service, otherwise a lightweight local store is acceptable for v1; confirm with the team before choosing.
+
+---
+
+## 5. Configuration (`appsettings.json`)
+
+```json
+{
+  "Smtp": {
+    "Host": "",
+    "Port": 587,
+    "EnableSsl": true,
+    "FromAddress": "no-reply@ubis.gov.in",
+    "FromName": "UBIS 2.0"
+  },
+  "RabbitMq": {
+    "HostName": "",
+    "Queue": "email.otp.send"
+  },
+  "Internal": {
+    "AllowedNetworks": []
+  }
+}
+```
+Do not hardcode SMTP credentials or RabbitMQ connection strings — pull from environment/secret store at runtime.
+
+---
+
+## 6. Security & Operational Notes
+
+- `EmailController` (REST fallback path) must be network-restricted — not reachable from outside the internal cluster/VPC.
+- Never log the plaintext OTP anywhere in this service, including exception messages and stack traces.
+- Mask email addresses (`us***@domain.com`) in all logs and in the `EmailDispatchLog` table.
+- This service has no knowledge of users, passwords, or authentication — it only sends what it's told to send. Keep it stateless and swappable.
+
+---
+
+## 7. Implementation Instruction to Claude Code
+
+> Build a new, independent .NET solution named `EmailService` per the folder layout in §1. Implement `IEmailSender`/`SmtpEmailSender`, the `RabbitMqOtpEmailConsumer` for queue `email.otp.send`, and the REST fallback `POST /internal/email/send-otp`, both conforming exactly to the payload in §2. Implement the `EmailDispatchLog` entity and logging behavior in §3–§4, respecting the "never log the raw OTP" rule. Wire configuration per §5. This is a fresh solution — do not assume any existing project structure, and do not reference or depend on the AIM codebase.

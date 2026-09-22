@@ -1,0 +1,104 @@
+@model UBIS.Web.Models.SidebarMenuViewModel
+
+<aside id="sidebar" data-menu-loaded="@Model.MenuLoaded.ToString().ToLowerInvariant()" class="fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col border-r border-slate-200 bg-white shadow-2xl transition-all duration-300 lg:translate-x-0 dark:border-slate-800 dark:bg-slate-950">
+    <div class="flex min-h-20 items-center gap-3 border-b border-slate-200 px-5 py-3 dark:border-slate-800">
+        <div class="emblem small"><img src="~/images/emblem-dark.png" alt="Government of India" width="30" height="30"></div>
+        <div class="sidebar-label min-w-0">
+            <p class="text-xs font-black uppercase text-teal">Ministry of Finance</p>
+            <p class="text-sm font-black whitespace-nowrap text-navy dark:text-white">Government of India</p>
+        </div>
+        <button data-sidebar-mobile class="ml-auto rounded-lg p-2 lg:hidden"><i data-lucide="x"></i></button>
+    </div>
+
+    <nav class="flex-1 overflow-y-auto px-3 py-4" aria-label="Primary navigation">
+        
+        @if (!Model.MenuLoaded)
+        {
+            <p class="sidebar-label px-2 text-sm text-slate-500" data-menu-loading-placeholder>Loading your menu&hellip;</p>
+        }
+        else if (!Model.Nodes.Any())
+        {
+            <p class="sidebar-label px-2 text-sm text-slate-500">No menu items are assigned to your role.</p>
+        }
+        @foreach (var app in Model.Nodes)
+        {
+            <details class="group sidebar-accordion" data-accordion="app-@app.AreaName" open="@ContainsActive(app)">
+                <summary class="nav-section @(ContainsActive(app) ? "is-current" : "")" title="@app.Title">
+                    <i data-lucide="@AppIcon(app.Title)"></i>
+                    <span class="sidebar-label">@app.Title</span>
+                    <i data-lucide="chevron-down" class="sidebar-label ml-auto h-3.5 w-3.5 transition accordion-chevron"></i>
+                </summary>
+                <div class="sidebar-label ml-4 space-y-1 border-l border-slate-200 pl-3 dark:border-slate-800">
+                    @foreach (var module in app.Children)
+                    {
+                        @if (module.IsLeaf)
+                        {
+                            <a asp-area="@module.AreaName" asp-controller="@module.ControllerName" asp-action="@module.ActionName" class="sub-link @(IsActive(module) ? "active-child" : "")" title="@module.Title">@module.Title</a>
+                        }
+                        else
+                        {
+                            <details class="group sidebar-accordion" data-accordion="module-@app.AreaName-@module.ControllerName" open="@ContainsActive(module)">
+                                <summary class="nav-section @(ContainsActive(module) ? "is-current" : "")" title="@module.Title">
+                                    <i data-lucide="folder"></i>
+                                    <span class="sidebar-label">@module.Title</span>
+                                    <i data-lucide="chevron-down" class="sidebar-label ml-auto h-3.5 w-3.5 transition accordion-chevron"></i>
+                                </summary>
+                                <div class="sidebar-label ml-8 space-y-1 border-l border-slate-200 pl-3 dark:border-slate-800">
+                                    @foreach (var function in module.Children)
+                                    {
+                                        <a asp-area="@function.AreaName" asp-controller="@function.ControllerName" asp-action="@function.ActionName" class="sub-link @(IsActive(function) ? "active-child" : "")" title="@function.Title">@function.Title</a>
+                                    }
+                                </div>
+                            </details>
+                        }
+                    }
+                </div>
+            </details>
+        }
+    </nav>
+</aside>
+
+@functions {
+    // Matches the designer's approved icon set (UBIS-Prototype mockup, assets/includes/
+    // sidebar.js's groupedNav + utilityNav) per top-level app, since M_AppName has no Icon column
+    // of its own yet. Keyed by the real dbo.M_AppName.AppName text (added 2026-08-18, extended
+    // 2026-08-28 to cover every real app - confirmed via M_AppName that 11 of the 14 real apps are
+    // in the designer's file, either as a groupedNav entry or a utilityNav entry; the 3 that
+    // aren't (MTEF, Debt Module, NSModule) keep the generic fallback since the designer never
+    // covered them). The previous "faq" case was dead code - there is no such M_AppName row, real
+    // or otherwise - dropped it once "file-plus-2" was confirmed to actually belong to
+    // "Supplementary Budget" per the mockup, not any FAQ screen.
+    private static string AppIcon(string title) => title?.Trim().ToLowerInvariant() switch
+    {
+        "combined dashboard" or "dashboard" => "layout-dashboard",
+        "pre budget meeting" or "pre-budget meeting" => "calendar-days",
+        "ddg" => "users-round",
+        "ecl" => "badge-check",
+        "exp budget(sbe)" or "exp budget (sbe)" => "indian-rupee",
+        "exp profile" => "chart-column",
+        "supplementary budget" => "file-plus-2",
+        "receipt budget" => "receipt",
+        "reappropriation" => "user-round",
+        "autonomous/grantee bodies" => "arrow-right-left",
+        "contingency advance" => "shield-alert",
+        _ => "layout-grid"
+    };
+
+    // Bug fix 2026-08-27 ("menu tree closes and shows only root nodes" on every page load, should
+    // stay open and highlight the selected row instead): this Razor view was the only piece of a
+    // working "active menu item" feature that never actually shipped - wwwroot/js/app.js has a
+    // simplifySidebar()/markActiveChild() pair implementing the same idea, but that file is
+    // designer-mockup code never <script>-included by the real _Layout.cshtml (same class of gap
+    // dialogs.js fixed for the save/validation dialogs) and hardcodes the mockup's own
+    // *.html/.sidebar-child-link markup anyway, not this app's real MVC routes. Server-side is also
+    // simply more correct here: SidebarMenuViewComponent already knows the exact current Area/
+    // Controller/Action and the full tree with real slugs, so this needs no client-side URL/href
+    // parsing and has no flash of collapsed state before JS would run.
+    private bool IsActive(UBIS.Web.Models.MenuNodeViewModel node) =>
+        string.Equals(node.AreaName ?? string.Empty, Model.CurrentArea ?? string.Empty, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(node.ControllerName, Model.CurrentController, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(node.ActionName, Model.CurrentAction, StringComparison.OrdinalIgnoreCase);
+
+    private bool ContainsActive(UBIS.Web.Models.MenuNodeViewModel node) =>
+        IsActive(node) || node.Children.Any(ContainsActive);
+}

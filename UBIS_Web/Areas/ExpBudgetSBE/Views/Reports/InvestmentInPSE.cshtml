@@ -1,0 +1,22 @@
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Investment In PSE";
+}
+
+<div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+    <p class="text-xs font-bold uppercase tracking-wide text-teal">@ViewData["Breadcrumb"]</p>
+    <h1 class="mt-1 text-xl font-black text-navy dark:text-white">Investment In PSE</h1>
+    <p class="mt-4 text-sm text-slate-500">
+        This data-entry page is pending design. It was generated automatically from the live
+        menu so the link works today &mdash; replace this body with the real form once designed.
+    </p>
+</div>
+
+@* Once a real data-entry <form> exists on this page, give it a stable autosave key so
+   wwwroot/js/autosave.js starts protecting it against network drops / forced sign-outs —
+   no other wiring is needed:
+
+   <form method="post" data-autosave-key="ExpBudgetSBE-Reports-InvestmentInPSE">
+       @Html.AntiForgeryToken()
+       ...
+   </form>
+*@

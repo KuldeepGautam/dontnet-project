@@ -1,0 +1,1 @@
+powershell -ExecutionPolicy Bypass -File "C:\UBIS2\Others\publish-staging\Republish-Microservices.ps1"

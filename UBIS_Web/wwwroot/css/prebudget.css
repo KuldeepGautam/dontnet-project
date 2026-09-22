@@ -1,0 +1,123 @@
+/* PreBudget appendix grid/entry-form conventions - shared across every appendix screen (Appendix
+   I-A, II, III, IV-A/B, VI/VI-B/VI-D/VI-E, VII-A/VII-B, XI, etc.), so each screen just applies
+   these class names instead of re-deriving the same alignment/weight rules inline. Client
+   requirement 2026-09-02, matching the designer mockup's fixed row-heading column (e.g. the
+   "Year" column left of a Revenue/Capital BE/RE/Actuals grid). */
+
+/* Fixed row-heading column - the row's own label (e.g. Year), bold so it reads as a heading and
+   stands out from the plain data cells beside it. !important is needed here (matches this file's
+   own established use of it elsewhere for the same reason): a bare header cell inside these
+   grids also matches styles.css's ".demo-table thead th" rule, whose specificity (one class + two
+   elements) otherwise beats a single-class ".row-heading" selector and silently keeps the
+   table's own default (lighter) header weight instead. */
+.row-heading {
+  font-weight: 700 !important;
+  text-align:center;
+}
+
+/* Serial-number column (S.No) in a grid - centered, not left/right aligned like real data. */
+.SrNo {
+  text-align: center;
+}
+
+/* Numeric data shown in a grid or a numeric textbox - right-aligned, the standard tabular/
+   accounting convention so digits line up on their ones place across rows. */
+.NumericData {
+  text-align: right;
+}
+
+/* Textual data-entry fields - right-aligned per client request. Only a-z/A-Z letters (plus
+   spaces, so ordinary multi-word text still works) are actually permitted at the keystroke level
+   - a CSS class alone can't restrict allowed characters, so this is enforced in
+   wwwroot/js/site.js's initInputMasking(), which strips anything else the instant a field
+   carrying this class is typed into. Just adding class="TextualData" is enough on its own -
+   no separate data-mask attribute needed. */
+.TextualData {
+  text-align: right;
+}
+
+/* Remarks-style free-text fields (client requirement 2026-09-02) - left-aligned like ordinary
+   prose (unlike .TextualData above, a Remarks box reads naturally left-aligned, not right).
+   Enforced character set: A-Z/a-z, 0-9, full stop, comma, plus spaces (a Remarks field that
+   rejected the space bar would make multi-word sentences impossible to type) - see
+   wwwroot/js/site.js's initInputMasking(), same class-name-is-the-trigger pattern as
+   .TextualData. Deliberately NOT applied to any Remarks-shaped field that already carries its
+   own wider mask/pattern (data-mask="no-special-chars"/"vib-remarks", or an explicit pattern=""
+   attribute) - those were put there to fix real bugs where a Remarks field needed reference-style
+   punctuation this narrower set doesn't allow (/ # $ % ' ( ) @ etc.); stacking this class on top
+   of one of those would silently re-break that fix. */
+.RemarksText {
+  text-align: left;
+}
+
+/* "All buttons should be of same size" (client requirement 2026-09-02) - a shared minimum width
+   so Submit/Reset/Freeze Data/Export etc. line up evenly in a button row regardless of label
+   length ("Submit" vs "Freeze Data"), instead of each button only being as wide as its own text +
+   padding. Doesn't touch .btn-primary/.btn-secondary/.btn-warning themselves (those stay global,
+   shared with every other module) - only elements that also opt in with this class get the fixed
+   width, so this can't ripple into ECL/SBE/etc. button rows that were never asked for this. */
+.btn-uniform {
+  min-width: 9.5rem;
+}
+
+/* SUPERSEDED 2026-09-07: this used to force a lightskyblue background on every focused
+   editable text field/textarea site-wide (client requirement 2026-09-02). The client's newer,
+   explicitly-approved design (UBIS_Drawer_Design.html / Appendix6a.html, rolled out starting
+   with Appendix VI-A and instructed to apply "for focus textbox or control for entire
+   application") is unambiguous that focus must be shown via a border highlight only, NEVER a
+   background-color change - a direct conflict with the older rule. Despite styles.css's own
+   .input:focus/.float-field input:focus/.field input:focus already being fixed to drop their
+   background swap earlier this session, this rule's raw `input:focus`/`textarea:focus` selector
+   has NO class scoping at all, so its `!important` was silently beating every one of those
+   fixes for every input/textarea in the app (including the Tailwind `.form-field` inputs in the
+   redesigned Appendix VI-A drawer) - the actual root cause of "still showing blue on focus"
+   surviving multiple earlier attempts that only ever touched Tailwind/config-side causes.
+   Replaced with the same border+ring highlight already used everywhere else, so a focused field
+   is shown the same way app-wide without ever touching background-color. */
+input:focus:not([readonly]):not(:disabled):not([type="checkbox"]):not([type="radio"]),
+textarea:focus:not([readonly]):not(:disabled) {
+  border-color: rgba(6, 174, 184, 0.58) !important;
+  box-shadow: 0 0 0 4px rgba(6, 174, 184, 0.12) !important;
+}
+
+/* Client instruction 2026-09-10: ONE uniform grid typography for every redesigned drawer-design
+   appendix (Appendix III/III-A/III-B, V-A/B/C, VI/VI-A..G, VII-A/VII-B, ...). Column headers
+   bold; the first column - the row's own heading - bold; every other data cell normal weight in
+   the default near-black text colour. This overrides the assorted per-cell font-semibold /
+   font-bold / text-slate-400/500/600/700/800 Tailwind utilities the drawer views sprinkle on
+   individual <td>s, so the whole thing is a CSS-only change with no per-view edits. Scoped to
+   .ubis-modern-appendix .grid-scroll (the redesigned grid wrapper) so nothing else is touched;
+   !important matches this file's own established convention for beating single-class Tailwind
+   utilities of higher-or-equal specificity. */
+.ubis-modern-appendix .grid-scroll table .via-grid-header-row th {
+  font-weight: 700 !important;
+}
+
+.ubis-modern-appendix .grid-scroll table tbody td {
+  font-weight: 400 !important;
+  color: #111827 !important;
+}
+
+.ubis-modern-appendix .grid-scroll table tbody td:first-child {
+  font-weight: 400 !important;
+}
+
+/* Client instruction 2026-09-10: every numeric amount field in an appendix reads right-aligned
+   (accounting convention). Most already carry .NumericData (right-aligned above) and/or Tailwind
+   text-right, but this guarantees it for any type="number" field that was missed. Scoped to the
+   redesigned drawer wrapper so no other module's number inputs are affected. (The "e"/"+"/"-"
+   keystroke block for these fields lives in PreBudget-validation.js.) */
+.ubis-modern-appendix input[type="number"] {
+  text-align: right;
+}
+
+/* Client instruction 2026-09-10: the appendix "Filter & Context" bar dropped its Demand /
+   Financial Year / Status fields (redundant context / handled by the grid + page banner);
+   only Search (and Appendix III's own Balance Type -> Scheme -> Sub-Scheme cascade) remain.
+   Their little header labels used the Tailwind `uppercase` utility - the client wants Title
+   Case instead, done here in CSS rather than by re-typing each label. `capitalize` isn't in
+   the precompiled tailwind.css bundle, so the rule lives here; the `uppercase` class was
+   removed from those spans in the views and replaced with `.appendix-filter-label`. */
+.ubis-modern-appendix .appendix-filter-label {
+  text-transform: capitalize;
+}

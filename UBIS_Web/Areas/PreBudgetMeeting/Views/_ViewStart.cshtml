@@ -1,0 +1,8 @@
+@{
+    // PreBudgetMeetingController sets ViewData["Layout"] = "" for AJAX requests (X-Requested-With:
+    // XMLHttpRequest) so the demand/appendix entry screens can be fetched as bare HTML fragments
+    // and injected into #partialViewContainer client-side, instead of a full page (with its own
+    // sidebar/header) being returned for every dropdown change - see
+    // PreBudgetMeetingController.OnActionExecuted.
+    Layout = ViewData.ContainsKey("Layout") ? ViewData["Layout"] as string : "~/Views/Shared/_Layout.cshtml";
+}

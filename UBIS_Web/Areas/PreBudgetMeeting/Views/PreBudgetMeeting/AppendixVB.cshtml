@@ -1,0 +1,288 @@
+@model UBIS.Web.Areas.PreBudgetMeeting.Models.AppendixVBViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Appendix V-B : Details of Establishment Expenditure - Object Head wise";
+    var yMinus2 = Model.PriorPriorFinancialYear;
+    var yMinus1 = Model.PriorFinancialYear;
+    var y = Model.FinancialYear;
+    var vbLocked = Model.IsVBLocked;
+
+    // Re-design 2026-09-14 (designer reference: UBIS-drawer-070926 "Appendix-V-B.html") - split out
+    // of the former tabbed AppendixVGroup.cshtml into its own standalone page (see AppendixVA.cshtml's
+    // matching header comment for the full reasoning). ObjectHeadId stays a real DB-backed <select>
+    // (Model.ObjectHeads) - the mockup's plain-text "Object Head" field is its own simplified static
+    // demo data, not a real field-type instruction.
+}
+
+<div class="ubis-modern-appendix">
+    <div class="mb-4 flex items-center justify-between">
+        <p class="text-xs font-bold uppercase tracking-wide text-red-600">Amount in Crores of Rupees</p>
+        <button type="button" class="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800" data-action="view-consolidated-report">View Consolidated Report</button>
+    </div>
+
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="mb-4">
+            <p class="text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="status">@Model.StatusMessage</p>
+        </div>
+    }
+
+    <section class="appendix-highlight mb-5 rounded-2xl border p-4">
+        <div class="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
+            <div class="flex items-start gap-3">
+                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-cyan-600 text-white shadow-lg shadow-indigo-200"><i data-lucide="briefcase" class="h-6 w-6"></i></div>
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-2xl font-extrabold tracking-tight text-indigo-950">Appendix V-B</h2>
+                        <span id="vbRecordCountBadge" class="rounded-full bg-white px-3 py-1 text-[10px] font-bold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200">@Model.VBRecords.Count Record@(Model.VBRecords.Count == 1 ? "" : "s")</span>
+                    @if (Model.IsVBFrozen)
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="freezedot"></span>Freezed
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="bluedot"></span>In Progress
+                        </span>
+                    }
+                    </div>
+                    <p class="mt-1.5 text-sm font-medium text-slate-600">Details of Establishment Expenditure - Object Head wise</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                @if (!Model.IsVBFrozen)
+                {
+                    <button type="submit" form="appendixVBForm" formnovalidate formaction="@Url.Action("FreezeAppendixTemplate")" class="inline-flex h-10 items-center justify-center rounded-lg bg-orange-100 px-4 text-sm font-semibold freeze-button shadow-sm transition hover:bg-orange-200 focus:outline-none focus:ring-4 focus:ring-orange-100">Freeze Data</button>
+                }
+                @if (!vbLocked)
+                {
+                    <button type="button" data-action="open-appendix-vb-add-drawer" class="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-ubis-navy px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-ubis-dark focus:outline-none focus:ring-4 focus:ring-blue-100"><i data-lucide="plus" class="h-4 w-4"></i>Add</button>
+                }
+            </div>
+        </div>
+    </section>
+
+        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
+        <div class="flex flex-col justify-between gap-3 border-b border-slate-100 px-5 py-3.5 sm:flex-row sm:items-center">
+            <div class="relative"><i data-lucide="search" class="absolute left-3 top-3 h-4 w-4 text-slate-400"></i><input id="vbSearchInput" type="search" placeholder="Search object head..." class="search-control" /></div>
+            <div class="flex items-center gap-2">
+                <div class="relative">
+                    <button id="vbColumnsButton" type="button" data-action="toggle-appendix-vb-columns-menu"
+                            class="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="vbColumnsMenu">
+                        <i data-lucide="columns-3" class="h-3.5 w-3.5"></i> Columns
+                    </button>
+                    <div id="vbColumnsMenu" class="absolute right-0 top-10 z-30 hidden w-56 overflow-hidden rounded-xl border border-slate-200 bg-white p-2 shadow-2xl" role="menu" aria-label="Choose visible columns">
+                        <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="objhead" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Object Head</label>
+                        <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="actuals" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Actual @yMinus2</label>
+                        <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="be" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">B.E. @yMinus1</label>
+                        <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="uptosept" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Actuals upto 9/@(yMinus1.Split('-')[0])</label>
+                        <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="re" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Proposed R.E. @yMinus1</label>
+                        <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="nbe" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Proposed B.E. @y</label>
+                        <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="remarks" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Remarks</label>
+                        <div class="mt-1 border-t border-slate-100 pt-1"><button type="button" data-action="reset-appendix-vb-columns" class="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50"><i data-lucide="rotate-ccw" class="h-3.5 w-3.5"></i>Reset columns</button></div>
+                    </div>
+                </div>
+                <div class="relative">
+                    <button id="vbExportButton" type="button" data-action="toggle-appendix-vb-export-menu"
+                            class="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="vbExportMenu">
+                        <i data-lucide="download" class="h-3.5 w-3.5"></i> Export
+                        <i data-lucide="chevron-down" class="h-3 w-3 text-slate-400"></i>
+                    </button>
+                    <div id="vbExportMenu" class="absolute right-0 top-10 z-30 hidden w-44 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-2xl">
+                        <button type="button" data-action="export-appendix-vb" data-format="pdf" class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-rose-600"><i data-lucide="file-text" class="h-4 w-4 text-rose-500"></i><span>PDF</span></button>
+                        <button type="button" data-action="export-appendix-vb" data-format="excel" class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-emerald-600"><i data-lucide="sheet" class="h-4 w-4 text-emerald-600"></i><span>Excel</span></button>
+                        <button type="button" data-action="export-appendix-vb" data-format="csv" class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-blue-600"><i data-lucide="file-spreadsheet" class="h-4 w-4 text-blue-500"></i><span>CSV</span></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="vbGridScroll" class="grid-scroll">
+            <span class="amtmsg">Amount in Crores of Rupees</span>
+            <table id="vbChargesTable" class="ubis-data-grid">
+                <thead class="ubis-data-grid__head ubis-data-grid__head--plain">
+                    <tr class="data-grid__header-row">
+                        <th class="w-[4%] px-2 py-3 text-center">S.No.</th>
+                        <th data-column="objhead" class="w-[16%] px-2 py-3"><button type="button" data-sort-key="objhead" class="flex items-center gap-1.5">Object Head</button></th>
+                        <th data-column="actuals" class="w-[10%] px-2 py-3 text-right">Actual @yMinus2</th>
+                        <th data-column="be" class="w-[10%] px-2 py-3 text-right">B.E. @yMinus1</th>
+                        <th data-column="uptosept" class="w-[11%] px-2 py-3 text-right">Actuals upto<br>9/@(yMinus1.Split('-')[0])</th>
+                        <th data-column="re" class="w-[10%] px-2 py-3 text-right">Proposed R.E.<br>@yMinus1</th>
+                        <th data-column="nbe" class="w-[10%] px-2 py-3 text-right">Proposed B.E.<br>@y</th>
+                        <th data-column="remarks" class="w-[14%] px-2 py-3">Remarks</th>
+                        @if (!vbLocked)
+                        {
+                            <th class="w-[8%] px-2 py-3 text-center" data-export-exclude="true">Action</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody id="vbGridBody" class="divide-y divide-slate-100">
+                    @if (Model.VBRecords.Count == 0)
+                    {
+                        <tr><td colspan="9" class="empty-state-cell">No records to display.</td></tr>
+                    }
+                    else
+                    {
+                        for (var vbi = 0; vbi < Model.VBRecords.Count; vbi++)
+                        {
+                            var r = Model.VBRecords[vbi];
+                            var ohLabel = r.ObjectHeadName ?? r.ObjectHeadCode ?? "-";
+                            var status = r.IsFrozen ? "Frozen" : "Active";
+                            <tr data-row data-status="@status" data-search="@ohLabel @status @r.Remarks" data-sort-objhead="@ohLabel"
+                                class="group border-b border-slate-100 transition odd:bg-white even:bg-slate-50/60 hover:bg-cyan-50/60 @(r.IsFrozen ? "bg-slate-50" : "")">
+                                <td class="px-2 py-3 text-center text-xs font-semibold text-slate-600" data-srno>@(vbi + 1)</td>
+                                <td data-column="objhead" class="break-words px-2 py-3 text-xs font-bold text-slate-800">@ohLabel</td>
+                                <td data-column="actuals" class="tabular px-2 py-3 text-right text-xs text-slate-700">@(r.Actuals?.ToString("0.00") ?? "0.00")</td>
+                                <td data-column="be" class="tabular px-2 py-3 text-right text-xs text-slate-700">@(r.BE?.ToString("0.00") ?? "0.00")</td>
+                                <td data-column="uptosept" class="tabular px-2 py-3 text-right text-xs text-slate-700">@(r.ActualsUptoSept?.ToString("0.00") ?? "0.00")</td>
+                                <td data-column="re" class="tabular px-2 py-3 text-right text-xs text-slate-700">@(r.ProposedRE?.ToString("0.00") ?? "0.00")</td>
+                                <td data-column="nbe" class="tabular px-2 py-3 text-right text-xs font-bold text-indigo-800">@(r.ProposedNBE?.ToString("0.00") ?? "0.00")</td>
+                                <td data-column="remarks" class="break-words px-2 py-3 text-xs text-slate-500">@(string.IsNullOrEmpty(r.Remarks) ? "—" : r.Remarks)</td>
+                                @if (!vbLocked)
+                                {
+                                    <td class="grid-action-cell px-2 py-3 text-center" data-export-exclude="true">
+                                        @if (!r.IsFrozen)
+                                        {
+                                            <div class="relative inline-block">
+                                                <button type="button" class="row-menu-btn inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100" data-action-id="@r.Id" aria-label="Actions for @ohLabel" aria-haspopup="true"><i data-lucide="more-horizontal" class="h-4 w-4"></i></button>
+                                                <div id="vb-menu-@r.Id" class="action-menu absolute right-0 top-9 z-20 hidden w-40 rounded-xl border border-slate-200 bg-white p-1.5 text-left shadow-xl">
+                                                    <button type="button" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
+                                                            data-action="edit-appendix-vb-record" data-id="@r.Id" data-object-head-id="@r.ObjectHeadId" data-actuals="@r.Actuals" data-actuals-upto-sept-prev-year="@r.ActualsUptoSeptPrevYear" data-be="@r.BE" data-actuals-upto-sept="@r.ActualsUptoSept" data-proposed-re="@r.ProposedRE" data-proposed-nbe="@r.ProposedNBE" data-remarks="@r.Remarks">
+                                                        <i data-lucide="pencil" class="h-3.5 w-3.5"></i>Edit
+                                                    </button>
+                                                    <button type="button" data-action="delete-appendix-vb-trigger" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-600 hover:bg-red-50"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i>Delete</button>
+                                                    <form method="post" asp-action="DeleteAppendixVB" class="hidden">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@r.Id" /><input type="hidden" name="demandId" value="@Model.DemandId" /></form>
+                                                </div>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-xs font-semibold text-slate-500">Frozen</span>
+                                        }
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div id="vbEmptyState" class="@(Model.VBRecords.Count == 0 ? "" : "hidden") px-6 py-14 text-center">
+            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400"><i data-lucide="search-x" class="h-5 w-5"></i></div>
+            <h4 class="mt-3 text-sm font-bold text-slate-700">No records found</h4>
+            <p class="mt-1 text-xs text-slate-500">@(Model.VBRecords.Count == 0 ? "No records to display yet." : "Try changing your filters or search criteria.")</p>
+        </div>
+        <div class="flex flex-col justify-between gap-3 border-t border-slate-100 px-5 py-3 sm:flex-row sm:items-center">
+            <div class="text-[11px] text-slate-500">Showing <span id="vbRangeText" class="font-semibold text-slate-700">@(Model.VBRecords.Count == 0 ? "0" : "1–" + Model.VBRecords.Count)</span> of <span id="vbTotalText" class="font-semibold text-slate-700">@Model.VBRecords.Count</span> records</div>
+            <div class="flex items-center gap-2">
+                <label class="hidden items-center gap-2 text-[11px] text-slate-500 sm:flex">Rows:
+                    <select id="vbPageSize" data-action="change-appendix-vb-page-size" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"><option value="10">10</option><option value="20">20</option><option value="50">50</option></select>
+                </label>
+                <button id="vbPrevBtn" type="button" data-action="appendix-vb-prev-page" class="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"><i data-lucide="chevron-left" class="h-3.5 w-3.5"></i> Previous</button>
+                <div id="vbPageNumbers" class="flex items-center gap-1"></div>
+                <button id="vbNextBtn" type="button" data-action="appendix-vb-next-page" class="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Next <i data-lucide="chevron-right" class="h-3.5 w-3.5"></i></button>
+            </div>
+        </div>
+    </section>
+
+    <div id="vbDrawerBackdrop" class="ubis-backdrop-hide fixed inset-0 z-[60] bg-slate-950/45 backdrop-blur-[2px] transition-opacity duration-300" aria-hidden="true"></div>
+    <aside id="vbDrawer" class="ubis-drawer-closed fixed right-0 top-0 z-[70] flex h-screen w-full max-w-[820px] flex-col border-l border-indigo-100 bg-white shadow-drawer transition-transform duration-300 ease-out" aria-label="Establishment expenditure form" aria-hidden="true">
+        <div class="flex shrink-0 items-center justify-between border-b border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-cyan-50 px-5 py-4">
+            <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-ubis-tealLight text-ubis-teal">
+                    <i data-lucide="file-spreadsheet" class="h-5 w-5"></i>
+                </div>
+                <div>
+                    <h2 id="vbDrawerTitle" class="text-base font-bold text-ubis-navy">Add Establishment Expenditure Record</h2>
+                    @* <p id="vbDrawerSubtitle" class="text-[11px] text-slate-500">Create a new record</p> *@
+                    <div class="mt-1.5 flex flex-wrap items-center gap-2">
+                        <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-800">Demand No. @Model.DemandNo</span>
+                        <span class="text-[10px] font-semibold italic text-red-600">Amount in Crores of Rupees</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <form method="post" autocomplete="off" asp-action="SaveAppendixVB" id="appendixVBForm" data-demand-id="@Model.DemandId" data-autosave-key="PreBudget-AppendixVB-@Model.DemandId" class="flex min-h-0 flex-1 flex-col">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="demandId" value="@Model.DemandId" />
+            <input type="hidden" name="code" value="V-B" />
+            <input type="hidden" asp-for="VBNewRecord.Id" />
+            <fieldset disabled="@vbLocked" style="border:none;margin:0;padding:0;display:contents;">
+            <div class="min-h-0 flex-1 overflow-y-auto bg-slate-50/70 px-5 py-5">
+                <section class="mb-4 rounded-xl border border-slate-200 bg-white">
+                    <div class="grid gap-4 p-4">
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Object Head <span class="text-red-500">*</span></label>
+                            <select id="VBNewRecord_ObjectHeadId" class="form-field h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" asp-for="VBNewRecord.ObjectHeadId" required>
+                                <option value="">Select</option>
+                                @foreach (var oh in Model.ObjectHeads)
+                                {
+                                    <option value="@oh.ObjectHeadId">@oh.Label</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid gap-3 p-4 md:grid-cols-2">
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Actual @yMinus2 <span class="text-red-500">*</span></p>
+                            <input class="NumericData tabular mt-2 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="VBNewRecord.Actuals" />
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Actuals upto 9/@(yMinus2.Split('-')[0]) <span class="text-red-500">*</span></p>
+                            <input class="NumericData tabular mt-2 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="VBNewRecord.ActualsUptoSeptPrevYear" />
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">B.E. @yMinus1 <span class="text-red-500">*</span></p>
+                            <input class="NumericData tabular mt-2 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="VBNewRecord.BE" />
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Actuals upto 9/@(yMinus1.Split('-')[0]) <span class="text-red-500">*</span></p>
+                            <input class="NumericData tabular mt-2 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="VBNewRecord.ActualsUptoSept" />
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Proposed R.E. @yMinus1 <span class="text-red-500">*</span></p>
+                            <input class="NumericData tabular mt-2 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="VBNewRecord.ProposedRE" />
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">Proposed B.E. @y <span class="text-red-500">*</span></p>
+                            <input class="NumericData tabular mt-2 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-right text-sm font-semibold text-slate-800 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="VBNewRecord.ProposedNBE" />
+                        </div>
+                    </div>
+                    <div class="p-4 pt-0">
+                        <label class="mb-1.5 block text-xs font-semibold text-slate-700">Remarks</label>
+                        <textarea class="RemarksText w-full resize-none rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" rows="3" placeholder="Enter remarks (optional)..." asp-for="VBNewRecord.Remarks"></textarea>
+                    </div>
+                </section>
+            </div>
+            <div class="flex shrink-0 items-center justify-end border-t border-slate-200 bg-white px-5 py-3.5">
+                <div class="flex items-center gap-2">
+                    <button type="reset" class="h-9 rounded-lg border border-ubis-navy px-3.5 text-xs font-semibold text-ubis-navy hover:bg-blue-50">Clear</button>
+                    <button type="button" data-action="close-appendix-vb-drawer" class="h-9 rounded-lg border border-slate-300 px-3.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                    <button type="submit" class="h-9 rounded-lg bg-ubis-teal px-4 text-xs font-bold text-white shadow-sm hover:bg-teal-700">Save Record</button>
+                </div>
+            </div>
+            </fieldset>
+        </form>
+    </aside>
+
+    <div id="vbToast" class="ubis-toast-hide ubis-toast-success fixed bottom-5 right-5 z-[100] flex w-[calc(100%-2rem)] max-w-sm items-start gap-3 rounded-xl border bg-white p-4 shadow-2xl transition-all duration-300" aria-live="polite" aria-atomic="true">
+        <div class="ubis-toast-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-full"><i id="vbToastIcon" data-lucide="check-circle-2" class="h-4 w-4"></i></div>
+        <div class="min-w-0 flex-1"><p id="vbToastTitle" class="text-xs font-bold text-slate-800">Success</p><p id="vbToastMessage" class="mt-0.5 text-[11px] text-slate-500"></p></div>
+        <button id="vbToastClose" type="button" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-4 focus:ring-slate-100" aria-label="Close notification"><i data-lucide="x" class="h-4 w-4"></i></button>
+    </div>
+    <div id="vbDeleteDialog" class="ubis-dialog-hide fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px] transition-opacity duration-200" role="dialog" aria-modal="true" aria-labelledby="vbDeleteDialogTitle" aria-hidden="true">
+        <div class="ubis-dialog-card w-full max-w-md rounded-2xl border border-red-100 bg-white p-5 shadow-2xl transition-all duration-200">
+            <div class="flex items-start gap-4">
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600"><i data-lucide="trash-2" class="h-5 w-5"></i></div>
+                <div class="min-w-0 flex-1"><h2 id="vbDeleteDialogTitle" class="text-base font-bold text-slate-900">Delete</h2><p class="mt-1 text-sm leading-5 text-slate-500">Are you sure you want to delete?</p></div>
+            </div>
+            <div class="mt-6 flex justify-end gap-2">
+                <button id="vbCancelDeleteBtn" type="button" class="h-10 rounded-lg border border-slate-300 px-4 text-xs font-bold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100">Cancel</button>
+                <button id="vbConfirmDeleteBtn" type="button" class="inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-100"><i data-lucide="trash-2" class="h-4 w-4"></i>Delete record</button>
+            </div>
+        </div>
+    </div>
+</div>

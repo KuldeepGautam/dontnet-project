@@ -1,0 +1,6 @@
+@MobilePhone.WebApi_HostAddress = http://localhost:5005
+
+GET {{MobilePhone.WebApi_HostAddress}}/health
+Accept: application/json
+
+###

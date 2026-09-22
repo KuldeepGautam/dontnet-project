@@ -1,0 +1,438 @@
+@model UBIS.Web.Areas.PreBudgetMeeting.Models.AppendixVIEViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Appendix VI-E : Details of Autonomous Bodies for which Corpus Fund has been created out of Grants-in-aid (GiA) support";
+    var yMinus1 = Model.PriorFinancialYear;
+    var asOnMarchYear = yMinus1.Split('-')[0];
+    var asOnSeptYear = yMinus1.Split('-')[0];
+    var yShort = yMinus1.Split('-')[0] + "-" + yMinus1.Split('-')[1].Substring(2);
+    var locked = Model.IsEntryLocked;
+
+    // Client requirement 2026-09-09: "Single entry per demand per Autonomous body ... once entry
+    // is there, add button will [be] shown but disabled" - VI-E allows one row PER Autonomous Body
+    // (not one row per Demand, like I-A/II - see ubis2_appendix_redesign_business_rules_checklist
+    // memory), so Add stays visible and only greys out once every Autonomous Body available for
+    // this Demand already has its own row (nothing left to add), not merely once ANY row exists.
+    var usedAutonomousBodyIds = Model.Records.Select(r => r.AutonomousBodyId).ToHashSet();
+    var hasAvailableAutonomousBody = Model.AutonomousBodies.Any(a => !usedAutonomousBodyIds.Contains(a.AutonomousBodyId));
+
+    // "Approved design for all appendixes" (2026-09-08, UBIS-Pre-budget-html/Appendix6e.html) -
+    // same drawer/grid theme already shipped for Appendix VI-A/VI-B/VI-C/VI-D. Note: the mockup
+    // file's own GRID section is a leftover copy-paste of Appendix6d.html's mock content (wrong
+    // columns entirely) - its DRAWER/form section further down the same file is the one that
+    // actually reflects VI-E's real fields, and is what this view's drawer is built from. Field
+    // set unchanged from the prior inline-table layout.
+}
+
+<div class="ubis-modern-appendix">
+    <section class="appendix-highlight mb-5 rounded-2xl border p-4">
+        <div class="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
+            <div class="flex items-start gap-3">
+                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-cyan-600 text-white shadow-lg shadow-indigo-200">
+                    <i data-lucide="landmark" class="h-6 w-6"></i>
+                </div>
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-2xl font-extrabold tracking-tight text-indigo-950">Appendix VI-E</h2>
+                        <span id="vieRecordCountBadge" class="rounded-full bg-white px-3 py-1 text-[10px] font-bold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200">@Model.Records.Count Record@(Model.Records.Count == 1 ? "" : "s")</span>
+                    @if (Model.IsAppendixFrozen)
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="freezedot"></span>Freezed
+                        </span>
+                    }
+                    else if (Model.IsNilSubmitted)
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="freezedot"></span>NIL
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="bluedot"></span>In Progress
+                        </span>
+                    }
+                    </div>
+                    <p class="mt-1.5 text-sm font-medium text-slate-600">Autonomous Bodies with Corpus Fund created out of Grants-in-aid (GiA) support</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                @* Freeze/Nil moved out of the drawer to sit next to Add, per designer markup
+                   (2026-09-08) - see AppendixVIA.cshtml's matching comment. *@
+                @if (Model.Records.Count == 0 && !locked)
+                {
+                    <button type="submit" form="appendixVIEForm" formnovalidate formaction="@Url.Action("SetNilSubmission")"
+                            class="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100">
+                        Nil
+                    </button>
+                }
+                @if (Model.Records.Count > 0 && !locked)
+                {
+                    <button type="submit" form="appendixVIEForm" formnovalidate formaction="@Url.Action("FreezeAppendixTemplate")"
+                            class="inline-flex h-10 items-center justify-center rounded-lg bg-orange-100 px-4 text-sm font-semibold freeze-button shadow-sm transition hover:bg-orange-200 focus:outline-none focus:ring-4 focus:ring-orange-100">
+                        Freeze Data
+                    </button>
+                }
+                @if (!locked)
+                {
+                    <button type="button" data-action="open-appendix-vie-add-drawer"
+                            disabled="@(hasAvailableAutonomousBody ? null : "disabled")"
+                            title="@(hasAvailableAutonomousBody ? null : "Every Autonomous Body already has an entry for this Demand.")"
+                            class="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-ubis-navy px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-ubis-dark focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-ubis-navy">
+                        <i data-lucide="plus" class="h-4 w-4"></i>Add
+                    </button>
+                }
+            </div>
+        </div>
+    </section>
+
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="mb-4">
+            <p class="text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="status">@Model.StatusMessage</p>
+        </div>
+    }
+
+    <!-- Filter & Context -->
+        <!-- Data Grid -->
+    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
+        <div class="flex flex-col justify-between gap-3 border-b border-slate-100 px-5 py-3.5 sm:flex-row sm:items-center">
+            <div class="relative"><i data-lucide="search" class="absolute left-3 top-3 h-4 w-4 text-slate-400"></i><input id="vieSearchInput" type="search" placeholder="Search autonomous body..." class="search-control" /></div>
+            <div class="flex items-center gap-2">
+                
+                <div class="relative">
+                    <button id="vieColumnsButton" type="button"
+                            class="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="vieColumnsMenu">
+                        <i data-lucide="columns-3" class="h-3.5 w-3.5"></i> Columns
+                    </button>
+                    <div id="vieColumnsMenu" class="absolute right-0 top-10 z-30 hidden w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl" role="menu" aria-label="Choose visible columns">
+                        <div class="border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-cyan-50 px-4 py-3">
+                            <p class="text-xs font-bold text-slate-800">Visible columns</p>
+                            <p class="mt-0.5 text-[10px] text-slate-500">Choose the information shown in the table.</p>
+                        </div>
+                        <div class="space-y-1 p-2">
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="body" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Autonomous Body</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="balance1" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Balance 31 Mar</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="balance2" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Balance 30 Sep</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="bank" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Bank Name</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="reason" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">Reason</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="giare" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">GiA RE</label>
+                            <label class="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><input type="checkbox" data-column-toggle="giabe" checked class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">GiA BE</label>
+                        </div>
+                        <div class="border-t border-slate-100 bg-slate-50 px-3 py-2.5">
+                            <button type="button" data-action="reset-appendix-vie-columns" class="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50"><i data-lucide="rotate-ccw" class="h-3.5 w-3.5"></i>Reset columns</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="relative">
+                    <button id="vieExportButton" type="button" data-action="toggle-appendix-vie-export-menu"
+                            class="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="vieExportMenu">
+                        <i data-lucide="download" class="h-3.5 w-3.5"></i> Export
+                        <i data-lucide="chevron-down" class="h-3 w-3 text-slate-400"></i>
+                    </button>
+                    <div id="vieExportMenu" class="absolute right-0 top-10 z-30 hidden w-44 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-2xl">
+                        <button type="button" data-action="export-appendix-vie" data-format="pdf"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-rose-600">
+                            <i data-lucide="file-text" class="h-4 w-4 text-rose-500"></i>
+                            <span>PDF</span>
+                        </button>
+                        <button type="button" data-action="export-appendix-vie" data-format="excel"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-emerald-600">
+                            <i data-lucide="sheet" class="h-4 w-4 text-emerald-600"></i>
+                            <span>Excel</span>
+                        </button>
+                        <button type="button" data-action="export-appendix-vie" data-format="csv"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-blue-600">
+                            <i data-lucide="file-spreadsheet" class="h-4 w-4 text-blue-500"></i>
+                            <span>CSV</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="vieGridScroll" class="grid-scroll">
+            <span class="amtmsg">Amount in Crores of Rupees</span>
+            <table id="chargesTable" class="ubis-data-grid">
+                <thead class="ubis-data-grid__head ubis-data-grid__head--plain">
+                    <tr class="data-grid__header-row">
+                        <th class="w-[4%] px-2 py-3 text-center">S.No.</th>
+                        <th data-column="body" class="w-[15%] px-2 py-3">
+                            <button type="button" data-sort-key="body" class="flex items-center gap-1.5">Autonomous Body</button>
+                        </th>
+                        <th data-column="balance1" class="w-[11%] px-2 py-3 text-right"><button type="button" data-sort-key="balance1" class="ml-auto flex items-center gap-1">Balance<br>31 Mar @asOnMarchYear</button></th>
+                        <th data-column="balance2" class="w-[11%] px-2 py-3 text-right"><button type="button" data-sort-key="balance2" class="ml-auto flex items-center gap-1">Balance<br>30 Sep @asOnSeptYear</button></th>
+                        <th data-column="bank" class="w-[14%] px-2 py-3">Bank Name</th>
+                        <th data-column="reason" class="w-[14%] px-2 py-3">Reason for Continuance</th>
+                        <th data-column="giare" class="w-[9%] px-2 py-3 text-right"><button type="button" data-sort-key="giare" class="ml-auto flex items-center gap-1">RE @yShort</button></th>
+                        <th data-column="giabe" class="w-[9%] px-2 py-3 text-right"><button type="button" data-sort-key="giabe" class="ml-auto flex items-center gap-1">BE @yShort</button></th>
+                        @if (!locked)
+                        {
+                            <th class="w-[6%] px-2 py-3 text-center">Action</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody id="gridBody" class="divide-y divide-slate-100">
+                    @for (var i = 0; i < Model.Records.Count; i++)
+                    {
+                        var r = Model.Records[i];
+                        var status = r.IsFrozen ? "Frozen" : "Active";
+                        var searchHaystack = string.Join(" ", new[] { r.Id.ToString(), r.AutonomousBodyName, r.CorpusFundBankName, status });
+                        <tr data-row data-status="@status" data-search="@searchHaystack" data-sort-body="@r.AutonomousBodyName"
+                            data-sort-balance1="@r.CorpusFundBalance1" data-sort-balance2="@r.CorpusFundBalance2" data-sort-giare="@r.GiaRE" data-sort-giabe="@r.GiaBE"
+                            class="group border-b border-slate-100 transition odd:bg-white even:bg-slate-50/60 hover:bg-cyan-50/60 @(r.IsFrozen ? "bg-slate-50" : "")">
+                            <td class="relative px-2 py-3 text-center text-xs font-semibold text-slate-600" data-srno>
+                                @if (r.IsFrozen)
+                                {
+                                    <span class="absolute left-0 top-0 bottom-0 w-1 bg-slate-700" title="Frozen record"></span>
+                                }
+                                @(i + 1)
+                            </td>
+                            <td data-column="body" class="break-words px-2 py-3 text-xs font-bold leading-5 text-slate-800">@(r.AutonomousBodyName ?? "-")</td>
+                            <td data-column="balance1" class="tabular px-2 py-3 text-right text-xs font-semibold text-slate-800">@(r.CorpusFundBalance1?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="balance2" class="tabular px-2 py-3 text-right text-xs font-semibold text-slate-800">@(r.CorpusFundBalance2?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="bank" class="break-words px-2 py-3 text-xs text-slate-600">@(string.IsNullOrEmpty(r.CorpusFundBankName) ? "—" : r.CorpusFundBankName)</td>
+                            <td data-column="reason" class="break-words px-2 py-3 text-xs text-slate-500">
+                                @if (string.IsNullOrEmpty(r.CorpusFundReason))
+                                {
+                                    @:—
+                                }
+                                else
+                                {
+                                    <span class="via-remarks-clamp" title="@r.CorpusFundReason">@r.CorpusFundReason</span>
+                                }
+                            </td>
+                            <td data-column="giare" class="tabular px-2 py-3 text-right text-xs font-bold text-indigo-800">@(r.GiaRE?.ToString("0.00") ?? "0.00")</td>
+                            <td data-column="giabe" class="tabular px-2 py-3 text-right text-xs font-bold text-indigo-800">@(r.GiaBE?.ToString("0.00") ?? "0.00")</td>
+                            @if (!locked)
+                            {
+                                <td class="grid-action-cell px-2 py-3 text-center">
+                                    @if (!r.IsFrozen)
+                                    {
+                                        <div class="relative inline-block">
+                                            <button type="button" class="row-menu-btn inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                                                    data-action-id="@r.Id" aria-label="Actions for @r.AutonomousBodyName" aria-haspopup="true">
+                                                <i data-lucide="more-horizontal" class="h-4 w-4"></i>
+                                            </button>
+                                            <div id="vie-menu-@r.Id" class="action-menu absolute right-0 top-9 z-20 hidden w-40 rounded-xl border border-slate-200 bg-white p-1.5 text-left shadow-xl">
+                                                <button type="button" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
+                                                        data-action="edit-appendix-vie-record"
+                                                        data-id="@r.Id"
+                                                        data-autonomous-body-id="@r.AutonomousBodyId"
+                                                        data-corpus-fund-balance1="@r.CorpusFundBalance1"
+                                                        data-corpus-fund-balance2="@r.CorpusFundBalance2"
+                                                        data-corpus-fund-bank-name="@r.CorpusFundBankName"
+                                                        data-corpus-fund-reason="@r.CorpusFundReason"
+                                                        data-gia-re="@r.GiaRE"
+                                                        data-gia-be="@r.GiaBE">
+                                                    <i data-lucide="pencil" class="h-3.5 w-3.5"></i>Edit
+                                                </button>
+                                                <button type="button" data-action="delete-appendix-vie-trigger" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-600 hover:bg-red-50">
+                                                    <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>Delete
+                                                </button>
+                                                <form method="post" asp-action="DeleteAppendixVIE" class="hidden">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@r.Id" />
+                                                    <input type="hidden" name="demandId" value="@Model.DemandId" />
+                                                </form>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-xs font-semibold text-slate-500">Frozen</span>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div id="vieEmptyState" class="@(Model.Records.Count == 0 ? "" : "hidden") px-6 py-14 text-center">
+            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                <i data-lucide="search-x" class="h-5 w-5"></i>
+            </div>
+            <h4 class="mt-3 text-sm font-bold text-slate-700">No records found</h4>
+            <p class="mt-1 text-xs text-slate-500">@(Model.Records.Count == 0 ? "No records to display yet." : "Try changing your filters or search criteria.")</p>
+            @if (Model.Records.Count > 0)
+            {
+                <button type="button" data-action="clear-appendix-vie-filters" class="mt-4 rounded-lg bg-ubis-navy px-4 py-2 text-xs font-semibold text-white">Clear Filters</button>
+            }
+        </div>
+
+        <div class="flex flex-col justify-between gap-3 border-t border-slate-100 px-5 py-3 sm:flex-row sm:items-center">
+            <div class="text-[11px] text-slate-500">
+                Showing <span id="vieRangeText" class="font-semibold text-slate-700">@(Model.Records.Count == 0 ? "0" : "1–" + Model.Records.Count)</span> of <span id="vieTotalText" class="font-semibold text-slate-700">@Model.Records.Count</span> records
+            </div>
+            <div class="flex items-center gap-2">
+                <label class="hidden items-center gap-2 text-[11px] text-slate-500 sm:flex">
+                    Rows:
+                    <select id="viePageSize" data-action="change-appendix-vie-page-size" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                    </select>
+                </label>
+                <button id="viePrevBtn" type="button" data-action="appendix-vie-prev-page" class="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    <i data-lucide="chevron-left" class="h-3.5 w-3.5"></i> Previous
+                </button>
+                <div id="viePageNumbers" class="flex items-center gap-1"></div>
+                <button id="vieNextBtn" type="button" data-action="appendix-vie-next-page" class="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    Next <i data-lucide="chevron-right" class="h-3.5 w-3.5"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Drawer backdrop - no data-action="close-appendix-vie-drawer" here, same fix already
+         proven for VI-A. Only the header's X button and the footer's Cancel button close it. -->
+    <div id="vieDrawerBackdrop" class="ubis-backdrop-hide fixed inset-0 z-[60] bg-slate-950/45 backdrop-blur-[2px] transition-opacity duration-300" aria-hidden="true"></div>
+
+    <!-- Right drawer - the REAL Add/Edit form (same asp-for bindings/POST action as before) -->
+    <aside id="vieDrawer" class="ubis-drawer-closed fixed right-0 top-0 z-[70] flex h-screen w-full max-w-[820px] flex-col border-l border-indigo-100 bg-white shadow-drawer transition-transform duration-300 ease-out" aria-label="Corpus fund form" aria-hidden="true">
+        <div class="flex shrink-0 items-center justify-between border-b border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-cyan-50 px-5 py-4">
+            <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-ubis-tealLight text-ubis-teal">
+                     <i data-lucide="file-spreadsheet" class="h-5 w-5"></i>
+                </div>
+                <div>
+                    <h2 id="vieDrawerTitle" class="text-base font-bold text-ubis-navy">Add Corpus Fund (GiA)</h2>
+                    @* <p id="vieDrawerSubtitle" class="text-[11px] text-slate-500">Create a new record</p> *@
+                    <div class="mt-1.5 flex flex-wrap items-center gap-2">
+                        <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-800">Demand No. @Model.DemandNo</span>
+                        <span class="text-[10px] font-semibold italic text-red-600">Amount in Crores of Rupees</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <form method="post" autocomplete="off" asp-action="SaveAppendixVIE" id="appendixVIEForm" data-demand-id="@Model.DemandId" data-autosave-key="PreBudget-AppendixVIE-@Model.DemandId" class="flex min-h-0 flex-1 flex-col">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="demandId" value="@Model.DemandId" />
+            <input type="hidden" name="code" value="VI-E" />
+            <input type="hidden" name="appendixId" value="@Model.AppendixId" />
+            <input type="hidden" asp-for="NewRecord.Id" />
+            <fieldset disabled="@locked" style="border:none;margin:0;padding:0;display:contents;">
+            <div class="min-h-0 flex-1 overflow-y-auto bg-slate-50/70 px-5 py-5">
+                @if (Model.IsNilSubmitted)
+                {
+                    <p class="mb-4 rounded-lg border border-teal-100 bg-ubis-tealLight px-3 py-2.5 text-sm text-slate-700">You have marked Nil Data for this Template, so data cannot be entered</p>
+                }
+                <section class="mb-4 rounded-xl border border-slate-200 bg-white">
+                    <div class="grid gap-4 p-4">
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Select Autonomous Body <span class="text-red-500">*</span></label>
+                            <select asp-for="NewRecord.AutonomousBodyId" required
+                                    class="form-field h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50">
+                                <option value="">Select</option>
+                                @foreach (var ab in Model.AutonomousBodies)
+                                {
+                                    <option value="@ab.AutonomousBodyId">@ab.Name</option>
+                                }
+                            </select>
+                            <p class="mt-1.5 text-[10px] text-red-600">To populate Autonomous in this list you need to add Autonomous to the master first. (RE Meeting → Autonomous Master for Appendix VI C and VI E)</p>
+                        </div>
+                    </div>
+
+                    <div class="grid pt-4 pl-3 md:grid-cols-1">
+                        <h3 class="text-sm font-bold text-slate-800">Corpus Fund Balance</h3>
+                    </div>
+                    <div class="grid gap-3 p-4 md:grid-cols-2">
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">As on 31.03.@asOnMarchYear <span class="text-red-500">*</span></p>
+                            <div class="relative mt-2">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.CorpusFundBalance1" />
+                            </div>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">As on 30.09.@asOnSeptYear <span class="text-red-500">*</span></p>
+                            <div class="relative mt-2">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.CorpusFundBalance2" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-3 p-4 md:grid-cols-2">
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Where the Corpus Fund is Maintained (Name of the Bank)</label>
+                            <input class="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" maxlength="500" asp-for="NewRecord.CorpusFundBankName" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-semibold text-slate-700">Reasons for Continuance of Autonomous Body</label>
+                            <input class="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="text" maxlength="1000" data-mask="no-special-chars" asp-for="NewRecord.CorpusFundReason" />
+                        </div>
+                    </div>
+
+                    <div class="grid pt-2 pl-3 md:grid-cols-1">
+                        <h3 class="text-sm font-bold text-slate-800">Grants-in-Aid Support Sought</h3>
+                    </div>
+                    <div class="grid gap-3 p-4 md:grid-cols-2">
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">RE @yShort <span class="text-red-500">*</span></p>
+                            <div class="relative mt-2">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-800 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.GiaRE" />
+                            </div>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-500">BE @yShort <span class="text-red-500">*</span></p>
+                            <div class="relative mt-2">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="revenue-input NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-800 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" required asp-for="NewRecord.GiaBE" />
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="flex shrink-0 items-center justify-end border-t border-slate-200 bg-white px-5 py-3.5">
+                <div class="flex items-center gap-2">
+                    <button type="reset" class="h-9 rounded-lg border border-ubis-navy px-3.5 text-xs font-semibold text-ubis-navy hover:bg-blue-50">Clear</button>
+                    <button type="button" data-action="close-appendix-vie-drawer" class="h-9 rounded-lg border border-slate-300 px-3.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                    <button type="submit" class="h-9 rounded-lg bg-ubis-teal px-4 text-xs font-bold text-white shadow-sm hover:bg-teal-700">Save Record</button>
+                </div>
+            </div>
+            </fieldset>
+        </form>
+    </aside>
+
+    <!-- Toast -->
+    <div id="vieToast" class="ubis-toast-hide ubis-toast-success fixed bottom-5 right-5 z-[100] flex w-[calc(100%-2rem)] max-w-sm items-start gap-3 rounded-xl border bg-white p-4 shadow-2xl transition-all duration-300" aria-live="polite" aria-atomic="true">
+        <div class="ubis-toast-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-full">
+            <i id="vieToastIcon" data-lucide="check-circle-2" class="h-4 w-4"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+            <p id="vieToastTitle" class="text-xs font-bold text-slate-800">Success</p>
+            <p id="vieToastMessage" class="mt-0.5 text-[11px] text-slate-500"></p>
+        </div>
+        <button id="vieToastClose" type="button" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-4 focus:ring-slate-100" aria-label="Close notification"><i data-lucide="x" class="h-4 w-4"></i></button>
+    </div>
+
+    <!-- Delete confirmation dialog -->
+    <div id="vieDeleteDialog" class="ubis-dialog-hide fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px] transition-opacity duration-200" role="dialog" aria-modal="true" aria-labelledby="vieDeleteDialogTitle" aria-hidden="true">
+        <div class="ubis-dialog-card w-full max-w-md rounded-2xl border border-red-100 bg-white p-5 shadow-2xl transition-all duration-200">
+            <div class="flex items-start gap-4">
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                    <i data-lucide="trash-2" class="h-5 w-5"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <h2 id="vieDeleteDialogTitle" class="text-base font-bold text-slate-900">Delete</h2>
+                    <p class="mt-1 text-sm leading-5 text-slate-500">Are you sure you want to delete?</p>
+                    <p id="vieDeleteRecordName" class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800"></p>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end gap-2">
+                <button id="vieCancelDeleteBtn" type="button" class="h-10 rounded-lg border border-slate-300 px-4 text-xs font-bold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100">Cancel</button>
+                <button id="vieConfirmDeleteBtn" type="button" class="inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-100"><i data-lucide="trash-2" class="h-4 w-4"></i>Delete record</button>
+            </div>
+        </div>
+    </div>
+</div>

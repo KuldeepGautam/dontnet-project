@@ -1,0 +1,593 @@
+@model UBIS.Web.Areas.PreBudgetMeeting.Models.AppendixIIIViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Appendix III : CNA/SNA Balances of Schemes";
+    var locked = Model.IsEntryLocked;
+
+    // "Approved design for all appendixes" (extended 2026-09-08 to Appendix III) - same drawer/grid
+    // theme reused verbatim (see ubis2_appendix_redesign_reuse_shared_files memory). Unlike I-A/II,
+    // III permits any number of records (keyed per Balance Type/Scheme/Sub-Scheme combination, not
+    // one-per-Demand) - Add stays available whenever the appendix isn't locked, same as VI-A..E.
+    // Balance Type -> Scheme -> Sub-Scheme cascade, the BE auto-load, and the "freeze Category/
+    // Scheme/Sub-Scheme during Edit" rule are all unchanged, still owned by
+    // PreBudget-control-binding.js's existing loadSchemesForCategory/loadSubSchemesForScheme/
+    // loadAppendixIIIBe/populateAppendixIIIEntryForm/lockSelectForEdit.
+    Func<string, string> categoryLabel = code => Model.Categories.FirstOrDefault(c => c.Value == code)?.Label ?? code;
+    // Client screenshot 2026-09-15: grid headers should spell out the literal calendar dates
+    // (01.04.2025/30.09.2025), not a relative "1-Apr"/"30-Sept" label - both dates fall in
+    // PriorFinancialYear's start year (e.g. "2025-2026" -> "2025").
+    var priorYearStart = Model.PriorFinancialYear.Split('-')[0];
+}
+
+<div class="ubis-modern-appendix">
+    <section class="appendix-highlight mb-5 rounded-2xl border p-4">
+        <div class="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
+            <div class="flex items-start gap-3">
+                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-cyan-600 text-white shadow-lg shadow-indigo-200">
+                    <i data-lucide="file-spreadsheet" class="h-6 w-6"></i>
+                </div>
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-2xl font-extrabold tracking-tight text-indigo-950">Appendix III</h2>
+                        @* <span id="iiiRecordCountBadge" class="rounded-full bg-white px-3 py-1 text-[10px] font-bold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200">@Model.Records.Count Record@(Model.Records.Count == 1 ? "" : "s")</span> *@
+                    @if (Model.IsAppendixFrozen)
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="freezedot"></span>Freezed
+                        </span>
+                    }
+                    else if (Model.IsNilSubmitted)
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="freezedot"></span>NIL
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold ring-1 ring-inset bg-indigo-100 text-indigo-800 ring-indigo-200">
+                            <span class="bluedot"></span>In Progress
+                        </span>
+                    }
+                    </div>
+                    <p class="mt-1.5 text-sm font-medium text-slate-600">CNA/SNA Balances of Schemes</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                @if (!Model.IsAppendixFrozen && !locked)
+                {
+                    <button type="submit" form="appendixIIIForm" formnovalidate formaction="@Url.Action("FreezeAppendixTemplate")"
+                            class="inline-flex h-10 items-center justify-center rounded-lg bg-orange-100 px-4 text-sm font-semibold freeze-button shadow-sm transition hover:bg-orange-200 focus:outline-none focus:ring-4 focus:ring-orange-100">
+                        Freeze Data
+                    </button>
+                }
+                @if (!locked)
+                {
+                    <button type="button" data-action="open-appendix-iii-add-drawer"
+                            class="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-ubis-navy px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-ubis-dark focus:outline-none focus:ring-4 focus:ring-blue-100">
+                        <i data-lucide="plus" class="h-4 w-4"></i>Add
+                    </button>
+                }
+            </div>
+        </div>
+    </section>
+
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="mb-4">
+            <p class="text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="status">@Model.StatusMessage</p>
+        </div>
+    }
+
+    <!-- Filter & Context -->
+    <section class="mb-5 rounded-2xl border border-slate-200 bg-white shadow-panel">
+        <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
+            <div class="flex items-center gap-2">
+                <i data-lucide="sliders-horizontal" class="h-4 w-4 text-ubis-teal"></i>
+                <h3 class="text-sm font-bold text-slate-700">Filter &amp; Context</h3>
+            </div>
+            <button type="button" data-action="clear-appendix-iii-filters" class="text-xs font-semibold text-ubis-blue hover:underline">Clear all</button>
+        </div>
+
+        @* Forced via inline style, not a Tailwind grid-cols-N/responsive-prefix utility class:
+           wwwroot/css/tailwind.css is a precompiled, build-time-generated bundle (see
+           tailwind.config.js's own header comment) - only the exact utility classes already
+           present somewhere in the codebase at the last `npx tailwindcss` build actually have CSS
+           rules shipped for them. "grid-cols-2"/"md:grid-cols-6" were never used anywhere else in
+           this app before, so adding them here has zero visible effect (confirmed: neither class
+           exists in tailwind.css at all) - this environment has no tailwindcss CLI available to
+           regenerate that bundle, so this single container uses a plain inline
+           grid-template-columns instead, which needs no precompiled class and always applies. *@
+        <div class="grid gap-2 p-4" style="grid-template-columns: 1.1fr 1.1fr 1.1fr 1.3fr auto;">
+            <label class="block min-w-0">
+                <span class="mb-1.5 block text-[10px] font-bold tracking-wide text-slate-500 appendix-filter-label">Balance Type</span>
+                <div class="relative">
+                    @* Client requirement 2026-09-18: no "All Balance Types" option - the dropdown
+                       always defaults to (and the grid always filters by) the first Balance Type
+                       in the list, same as any other single-select filter with no "all" state. *@
+                    <select id="iiiBalanceTypeFilter" class="h-9 w-full appearance-none rounded-lg border border-slate-300 bg-white px-2 pr-7 text-xs font-medium text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50">
+                        <option value="">Please Select</option>
+                        @foreach (var category in Model.Categories)
+                        {
+                            <option value="@category.Value">@category.Label</option>
+                        }
+                    </select>
+                    <i data-lucide="chevron-down" class="pointer-events-none absolute right-2 top-2.5 h-3.5 w-3.5 text-slate-400"></i>
+                </div>
+            </label>
+
+            @* Scheme depends on Balance Type, Sub-Scheme depends on Scheme. Client instruction
+               2026-09-21: "implement same logic of balance type, scheme name and sub scheme name
+               in appendix III filter" - i.e. the same grid-driven approach as Appendix IV/IV-A/
+               IV-B's own Filter & Context panel. This full option list is server-rendered from
+               Model.Records (every Scheme/Sub-Scheme with at least one row anywhere in the grid);
+               appendix-iii-drawer.js's rebuildAppendixIIIDependentFilterOptions (called from
+               applyGridFilters) hides/disables whichever options don't have a matching row for the
+               currently-selected Balance Type/Scheme, entirely client-side - no AJAX round trip
+               (superseded the earlier GetAppendixIIISchemes/GetAppendixIIISubSchemes-backed
+               cascade this comment used to describe). *@
+            <label class="block min-w-0">
+                <span class="mb-1.5 block text-[10px] font-bold tracking-wide text-slate-500 appendix-filter-label">Scheme</span>
+                <div class="relative">
+                    <select id="iiiSchemeFilter" class="h-9 w-full appearance-none rounded-lg border border-slate-300 bg-white px-2 pr-7 text-xs font-medium text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50 disabled:bg-slate-100 disabled:text-slate-400">
+                        <option value="All">All Schemes</option>
+                        @foreach (var scheme in Model.Records.Where(r => r.SchemeId.HasValue).GroupBy(r => r.SchemeId!.Value).Select(g => new { Id = g.Key, Name = g.First().SchemeName }).OrderBy(s => s.Name))
+                        {
+                            <option value="@scheme.Id">@scheme.Name</option>
+                        }
+                    </select>
+                    <i data-lucide="chevron-down" class="pointer-events-none absolute right-2 top-2.5 h-3.5 w-3.5 text-slate-400"></i>
+                </div>
+            </label>
+
+            <label class="block min-w-0">
+                <span class="mb-1.5 block text-[10px] font-bold tracking-wide text-slate-500 appendix-filter-label">Sub-Scheme</span>
+                <div class="relative">
+                    <select id="iiiSubSchemeFilter" class="h-9 w-full appearance-none rounded-lg border border-slate-300 bg-white px-2 pr-7 text-xs font-medium text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50 disabled:bg-slate-100 disabled:text-slate-400">
+                        <option value="All">All Sub-Schemes</option>
+                        @foreach (var subScheme in Model.Records.Where(r => r.SubSchemeId.HasValue).GroupBy(r => r.SubSchemeId!.Value).Select(g => new { Id = g.Key, Name = g.First().SubSchemeName, SchemeId = g.First().SchemeId }).OrderBy(s => s.Name))
+                        {
+                            <option value="@subScheme.Id" data-scheme-id="@subScheme.SchemeId">@subScheme.Name</option>
+                        }
+                    </select>
+                    <i data-lucide="chevron-down" class="pointer-events-none absolute right-2 top-2.5 h-3.5 w-3.5 text-slate-400"></i>
+                </div>
+            </label>         
+            @* <div class="flex items-end">
+                <button type="button" data-action="apply-appendix-iii-filters"
+                        class="h-9 w-full rounded-lg bg-ubis-teal px-3 text-xs font-bold text-white hover:bg-teal-700">
+                    Apply
+                </button>
+            </div> *@
+        </div>
+    </section>
+
+    <!-- Data Grid -->
+    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-panel">
+        <div id="iiiGridToolbar" class="hidden flex flex-col justify-between gap-3 border-b border-slate-100 px-5 py-3.5 sm:flex-row sm:items-center">
+            <label class="block min-w-0">              
+                <div class="positioned-context">
+                    <i data-lucide="search" class="absolute left-3 top-3 h-4 w-8 text-slate-400"></i>
+                    <input id="iiiSearchInput" type="search" placeholder="Search" class="search-control" />
+                </div>
+            </label>
+            <div class="flex items-center gap-2">
+                
+                <div class="relative">
+                    <button id="iiiColumnsButton" type="button"
+                            class="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="iiiColumnsMenu">
+                        <i data-lucide="columns-3" class="h-3.5 w-3.5"></i> Columns
+                    </button>
+                    <div id="iiiColumnsMenu" class="absolute right-0 top-10 z-30 hidden w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl" role="menu" aria-label="Choose visible columns">
+                        <div class="border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-cyan-50 px-4 py-3">
+                            <p class="text-xs font-bold text-slate-800">Visible columns</p>
+                            <p class="mt-0.5 text-[10px] text-slate-500">Choose the information shown in the table.</p>
+                        </div>
+                        <div id="iiiColumnsOptions" class="space-y-1 p-2"></div>
+                        <div class="border-t border-slate-100 bg-slate-50 px-3 py-2.5">
+                            <button type="button" data-action="reset-appendix-iii-columns" class="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50"><i data-lucide="rotate-ccw" class="h-3.5 w-3.5"></i>Reset columns</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="relative">
+                
+                <button id="iiiExportButton" type="button" data-action="toggle-appendix-iii-export-menu"
+                            class="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="iiiExportMenu">
+                        <i data-lucide="download" class="h-3.5 w-3.5"></i> Export
+                        <i data-lucide="chevron-down" class="h-3 w-3 text-slate-400"></i>
+                    </button>
+                    <div id="iiiExportMenu" class="absolute right-0 top-10 z-30 hidden w-44 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-2xl">
+                        <button type="button" data-action="export-appendix-iii" data-format="pdf"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-rose-600">
+                            <i data-lucide="file-text" class="h-4 w-4 text-rose-500"></i>
+                            <span>PDF</span>
+                        </button>
+                        <button type="button" data-action="export-appendix-iii" data-format="excel"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-emerald-600">
+                            <i data-lucide="sheet" class="h-4 w-4 text-emerald-600"></i>
+                            <span>Excel</span>
+                        </button>
+                        <button type="button" data-action="export-appendix-iii" data-format="csv"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-blue-600">
+                            <i data-lucide="file-spreadsheet" class="h-4 w-4 text-blue-500"></i>
+                            <span>CSV</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="iiiGridScroll" class="grid-scroll">
+            <span class="amtmsg">Amount in Crores of Rupees</span>
+            <table id="chargesTable" data-scheme-grid-for="appendixIIIForm" class="ubis-data-grid">
+                <thead class="ubis-data-grid__head">
+                    <tr class="data-grid__header-row">
+                        <th class="w-[4%] px-2 py-3 text-center">S.No.</th>
+                        <th data-column="category" class="w-[10%] px-2 py-3 text-left">Balance Type</th>
+                        <th data-column="scheme" class="w-[11%] px-2 py-3 text-left">Scheme Name</th>
+                        <th data-column="subscheme" class="w-[11%] px-2 py-3 text-left">Sub-Scheme Name</th>
+                        <th data-column="be" class="w-[7%] px-2 py-3 text-right">BE @Model.PriorFinancialYear</th>
+                        <th data-column="opening" class="w-[9%] px-2 py-3 text-right">CNA balance as on<br>01.04.@priorYearStart</th>
+                        <th data-column="releases" class="w-[9%] px-2 py-3 text-right">Releases during the<br>current FY till 30.09.@priorYearStart</th>
+                        <th data-column="closing" class="w-[9%] px-2 py-3 text-right">CNA Balance as on<br>30.09.@priorYearStart</th>
+                        <th data-column="nottransferred" class="w-[9%] px-2 py-3 text-right">Central releases lying in State treasury but Not Transferred to SNA (30-Sept)</th>
+                        <th data-column="lastrelease-date" class="w-[8%] px-2 py-3 text-right">Date of<br>Last Release</th>
+                        <th data-column="lastrelease-amount" class="w-[8%] px-2 py-3 text-right">Amount of<br>Last Release</th>
+                        <th data-column="reason" class="w-[9%] px-2 py-3 text-left">Reason for Exemption</th>
+                        @if (!locked)
+                        {
+                            <th data-export-exclude="true" class="w-[6%] px-2 py-3 text-center">Action</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody id="gridBody" class="divide-y divide-slate-100">
+                    @if (Model.Records.Count == 0)
+                    {
+                        <tr><td colspan="13" class="empty-state-cell">No records to display.</td></tr>
+                    }
+                    else
+                    {
+                        for (var i = 0; i < Model.Records.Count; i++)
+                        {
+                            var r = Model.Records[i];
+                            var status = r.IsFrozen ? "Frozen" : "Active";
+                            // Client requirement 2026-09-18: search must match every visible grid
+                            // column, including numeric BE/balance/release figures and the last-release
+                            // date - matching this grid's existing all-columns sort exception (see
+                            // ubis2_grid_sort_search_text_columns_only memory).
+                            var searchHaystack = string.Join(" ", new[]
+                            {
+                                categoryLabel(r.CategoryType), r.SchemeName, r.SubSchemeName, status, r.ReasonForExemption,
+                                r.BE?.ToString("0.00") ?? "0.00",
+                                r.BalanceAsOnAprilOpening?.ToString("0.00") ?? "0.00",
+                                r.ReleasesDuringFY?.ToString("0.00") ?? "0.00",
+                                r.BalanceAsOnSeptClosing?.ToString("0.00") ?? "0.00",
+                                r.CategoryType == "CentrallySponsoredScheme" ? (r.NotTransferredToSnaAsOnSept?.ToString("0.00") ?? "0.00") : "",
+                                r.DateOfLastRelease?.ToString("dd-MMM-yyyy") ?? "",
+                                r.AmountOfLastRelease?.ToString("0.00") ?? "0.00"
+                            });
+                            var isExempted = r.CategoryType is "ExemptedFromCna" or "ExemptedFromSna";
+                            <tr data-row data-scheme-id="@r.SchemeId" data-sub-scheme-id="@r.SubSchemeId" data-category-type="@r.CategoryType" data-status="@status" data-search="@searchHaystack"
+                                data-sort-category="@categoryLabel(r.CategoryType)" data-sort-scheme="@r.SchemeName" data-sort-subscheme="@r.SubSchemeName"
+                                data-sort-be="@r.BE" data-sort-opening="@r.BalanceAsOnAprilOpening" data-sort-releases="@r.ReleasesDuringFY" data-sort-closing="@r.BalanceAsOnSeptClosing" data-sort-reason="@r.ReasonForExemption"
+                                data-sort-nottransferred="@(r.CategoryType == "CentrallySponsoredScheme" ? r.NotTransferredToSnaAsOnSept : null)"
+                                data-sort-dateofrelease="@r.DateOfLastRelease?.ToString("yyyy-MM-dd")" data-sort-amountofrelease="@r.AmountOfLastRelease"
+                                class="group border-b border-slate-100 transition odd:bg-white even:bg-slate-50/60 hover:bg-cyan-50/60 @(r.IsFrozen ? "bg-slate-50" : "")">
+                                <td class="relative row-sr-no SrNo px-2 py-3 text-center text-xs font-semibold text-slate-600" data-srno>
+                                    @if (r.IsFrozen)
+                                    {
+                                        <span class="absolute left-0 top-0 bottom-0 w-1 bg-slate-700" title="Frozen record"></span>
+                                    }
+                                    @(i + 1)
+                                </td>
+                                <td data-column="category" class="px-2 py-3 text-left text-xs font-semibold text-slate-700">@categoryLabel(r.CategoryType)</td>
+                                <td data-column="scheme" class="px-2 py-3 text-left text-xs text-slate-700">@(r.SchemeName ?? "-")</td>
+                                <td data-column="subscheme" class="px-2 py-3 text-left text-xs text-slate-700">@(r.SubSchemeName ?? "-")</td>
+                                @if (isExempted)
+                                {
+                                    <td data-column="be" class="tabular px-2 py-3 text-right text-xs text-slate-400">—</td>
+                                    <td data-column="opening" class="tabular px-2 py-3 text-right text-xs text-slate-400">—</td>
+                                    <td data-column="releases" class="tabular px-2 py-3 text-right text-xs text-slate-400">—</td>
+                                    <td data-column="closing" class="tabular px-2 py-3 text-right text-xs text-slate-400">—</td>
+                                    <td data-column="nottransferred" class="tabular px-2 py-3 text-right text-xs text-slate-400">—</td>
+                                    <td data-column="lastrelease-date" class="px-2 py-3 text-right text-xs text-slate-400">—</td>
+                                    <td data-column="lastrelease-amount" class="tabular px-2 py-3 text-right text-xs text-slate-400">—</td>
+                                }
+                                else
+                                {
+                                    <td data-column="be" class="tabular px-2 py-3 text-right text-xs font-semibold text-slate-800">@(r.BE?.ToString("0.00") ?? "0.00")</td>
+                                    <td data-column="opening" class="tabular px-2 py-3 text-right text-xs font-semibold text-slate-800">@(r.BalanceAsOnAprilOpening?.ToString("0.00") ?? "0.00")</td>
+                                    <td data-column="releases" class="tabular px-2 py-3 text-right text-xs font-semibold text-slate-800">@(r.ReleasesDuringFY?.ToString("0.00") ?? "0.00")</td>
+                                    <td data-column="closing" class="tabular px-2 py-3 text-right text-xs font-bold text-slate-800">@(r.BalanceAsOnSeptClosing?.ToString("0.00") ?? "0.00")</td>
+                                    <td data-column="nottransferred" class="tabular px-2 py-3 text-right text-xs font-semibold text-slate-800">@(r.CategoryType == "CentrallySponsoredScheme" ? (r.NotTransferredToSnaAsOnSept?.ToString("0.00") ?? "0.00") : "—")</td>
+                                    <td data-column="lastrelease-date" class="px-2 py-3 text-right text-[11px] text-slate-600">@(r.DateOfLastRelease?.ToString("dd-MMM-yyyy") ?? "-")</td>
+                                    <td data-column="lastrelease-amount" class="tabular px-2 py-3 text-right text-xs font-semibold text-slate-800">@(r.AmountOfLastRelease?.ToString("0.00") ?? "0.00")</td>
+                                }
+                                <td data-column="reason" class="break-words px-2 py-3 text-left text-xs text-slate-600">@(string.IsNullOrEmpty(r.ReasonForExemption) ? "—" : r.ReasonForExemption)</td>
+                                @if (!locked)
+                                {
+                                    <td data-export-exclude="true" class="grid-action-cell px-2 py-3 text-center">
+                                        @if (!r.IsFrozen)
+                                        {
+                                            <div class="relative inline-block">
+                                                <button type="button" class="row-menu-btn inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                                                        data-action-id="@r.Id" aria-label="Actions for record @(i + 1)" aria-haspopup="true">
+                                                    <i data-lucide="more-horizontal" class="h-4 w-4"></i>
+                                                </button>
+                                                <div id="iii-menu-@r.Id" class="action-menu absolute right-0 top-9 z-20 hidden w-40 rounded-xl border border-slate-200 bg-white p-1.5 text-left shadow-xl">
+                                                    <button type="button" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
+                                                            data-action="edit-appendix-iii-record"
+                                                            data-id="@r.Id"
+                                                            data-category-type="@r.CategoryType"
+                                                            data-scheme-id="@r.SchemeId"
+                                                            data-sub-scheme-id="@r.SubSchemeId"
+                                                            data-be="@r.BE"
+                                                            data-balance-as-on-april-opening="@r.BalanceAsOnAprilOpening"
+                                                            data-releases-during-fy="@r.ReleasesDuringFY"
+                                                            data-balance-as-on-sept-closing="@r.BalanceAsOnSeptClosing"
+                                                            data-date-of-last-release="@r.DateOfLastRelease?.ToString("yyyy-MM-dd")"
+                                                            data-amount-of-last-release="@r.AmountOfLastRelease"
+                                                            data-not-transferred-to-sna-as-on-sept="@r.NotTransferredToSnaAsOnSept"
+                                                            data-reason-for-exemption="@r.ReasonForExemption">
+                                                        <i data-lucide="pencil" class="h-3.5 w-3.5"></i>Edit
+                                                    </button>
+                                                    <button type="button" data-action="delete-appendix-iii-trigger" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium text-red-600 hover:bg-red-50">
+                                                        <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>Delete
+                                                    </button>
+                                                    <form method="post" asp-action="DeleteAppendixIII" class="hidden">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="id" value="@r.Id" />
+                                                        <input type="hidden" name="demandId" value="@Model.DemandId" />
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-xs font-semibold text-slate-500">Frozen</span>
+                                        }
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div id="iiiEmptyState" class="@(Model.Records.Count == 0 ? "" : "hidden") px-6 py-14 text-center">
+            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                <i data-lucide="search-x" class="h-5 w-5"></i>
+            </div>
+            <h4 class="mt-3 text-sm font-bold text-slate-700">No records found</h4>
+            <p class="mt-1 text-xs text-slate-500">@(Model.Records.Count == 0 ? "No records to display yet." : "Try changing your filters or search criteria.")</p>
+            @if (Model.Records.Count > 0)
+            {
+                <button type="button" data-action="clear-appendix-iii-filters" class="mt-4 rounded-lg bg-ubis-navy px-4 py-2 text-xs font-semibold text-white">Clear Filters</button>
+            }
+        </div>
+
+        <div class="flex flex-col justify-between gap-3 border-t border-slate-100 px-5 py-3 sm:flex-row sm:items-center">
+            <div class="text-[11px] text-slate-500">
+                Showing <span id="iiiRangeText" class="font-semibold text-slate-700">@(Model.Records.Count == 0 ? "0" : "1–" + Model.Records.Count)</span> of <span id="iiiTotalText" class="font-semibold text-slate-700">@Model.Records.Count</span> records
+            </div>
+            <div class="flex items-center gap-2">
+                <label class="hidden items-center gap-2 text-[11px] text-slate-500 sm:flex">
+                    Rows:
+                    <select id="iiiPageSize" data-action="change-appendix-iii-page-size" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                    </select>
+                </label>
+                <button id="iiiPrevBtn" type="button" data-action="appendix-iii-prev-page" class="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    <i data-lucide="chevron-left" class="h-3.5 w-3.5"></i> Previous
+                </button>
+                <div id="iiiPageNumbers" class="flex items-center gap-1"></div>
+                <button id="iiiNextBtn" type="button" data-action="appendix-iii-next-page" class="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    Next <i data-lucide="chevron-right" class="h-3.5 w-3.5"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Drawer backdrop - no data-action="close-appendix-iii-drawer" here, same fix already
+         proven for VI-A. Only the header's X button and the footer's Cancel button close it. -->
+    <div id="iiiDrawerBackdrop" class="ubis-backdrop-hide fixed inset-0 z-[60] bg-slate-950/45 backdrop-blur-[2px] transition-opacity duration-300" aria-hidden="true"></div>
+
+    <!-- Right drawer - the REAL Add/Edit form (same asp-for bindings/POST action/cascade as before) -->
+    <aside id="iiiDrawer" class="ubis-drawer-closed fixed right-0 top-0 z-[70] flex h-screen w-full max-w-[820px] flex-col border-l border-indigo-100 bg-white shadow-drawer transition-transform duration-300 ease-out" aria-label="CNA/SNA Balance form" aria-hidden="true">
+        <div class="flex shrink-0 items-center justify-between border-b border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-cyan-50 px-5 py-4">
+            <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-ubis-tealLight text-ubis-teal">
+                    <i data-lucide="file-spreadsheet" class="h-5 w-5"></i>
+                </div>
+                <div>
+                    <h2 id="iiiDrawerTitle" class="text-base font-bold text-ubis-navy">Add CNA/SNA Balance</h2>
+                    @* <p id="iiiDrawerSubtitle" class="text-[11px] text-slate-500">Create a new record</p> *@
+                    <div class="mt-1.5 flex flex-wrap items-center gap-2">
+                        <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-800">Demand No. @Model.DemandNo</span>
+                        <span class="text-[10px] font-semibold italic text-red-600">Amount in Crores of Rupees</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <form method="post" autocomplete="off" asp-action="SaveAppendixIII" id="appendixIIIForm" data-demand-id="@Model.DemandId" data-autosave-key="PreBudget-AppendixIII-@Model.DemandId" data-selected-scheme-id="@Model.NewRecord.SchemeId" data-selected-subscheme-id="@Model.NewRecord.SubSchemeId" class="flex min-h-0 flex-1 flex-col">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="demandId" value="@Model.DemandId" />
+            <input type="hidden" name="code" value="III" />
+            <input type="hidden" asp-for="NewRecord.Id" />
+            <fieldset disabled="@locked" style="border:none;margin:0;padding:0;display:contents;">
+            <div class="min-h-0 flex-1 overflow-y-auto bg-slate-50/70 px-5 py-5">
+                @if (Model.IsNilSubmitted)
+                {
+                    <p class="mb-4 rounded-lg border border-teal-100 bg-ubis-tealLight px-3 py-2.5 text-sm text-slate-700">You have marked Nil Data for this Template, so data cannot be entered</p>
+                }
+                <section class="mb-4 rounded-xl border border-slate-200 bg-white">
+                    <div class="grid pt-4 pl-3 md:grid-cols-1">
+                        <h3 class="text-sm font-bold text-slate-800">Scheme Identification</h3>
+                    </div>
+                    <div class="grid gap-3 p-4 md:grid-cols-3">
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold tracking-wide text-slate-500">Balance Type <span class="text-red-500">*</span></p>
+                            <select class="mt-2 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" required asp-for="NewRecord.CategoryType">
+                                <option value="">Select</option>
+                                @foreach (var category in Model.Categories)
+                                {
+                                    <option value="@category.Value">@category.Label</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold tracking-wide text-slate-500">Scheme <span class="text-red-500">*</span></p>
+                            <select class="mt-2 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" required asp-for="NewRecord.SchemeId" disabled data-role="scheme-filter">
+                                <option value="">Select Balance Type first</option>
+                            </select>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold tracking-wide text-slate-500">Sub-Scheme</p>
+                            <select class="mt-2 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" asp-for="NewRecord.SubSchemeId" disabled>
+                                <option value="">Select Scheme first</option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Financial Details - Central Sector Schemes/Projects (CNA) and Centrally Sponsored
+                     Schemes (SNA) only. Hidden entirely for the 2 "exempted" Balance Types, which
+                     capture a Reason for Exemption instead (see the section below) - client
+                     screenshots 2026-09-09. Opening/Closing labels and the extra "Not Transferred to
+                     SNA" field toggle via appendix-iii-drawer.js's applyAppendixIIIBalanceTypeUI,
+                     keyed off the selected Balance Type. -->
+                <section data-balance-section="financial" class="mb-4 rounded-xl border border-slate-200 bg-white">
+                    <div class="grid pt-4 pl-3 md:grid-cols-1">
+                        <h3 class="text-sm font-bold text-slate-800">Balance Figures - @Model.PriorFinancialYear</h3>
+                    </div>
+                    <div class="grid gap-3 p-4 md:grid-cols-2">
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold tracking-wide text-slate-500">BE @Model.PriorFinancialYear <span class="text-red-500">*</span></p>
+                            <div class="relative mt-2">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-slate-100 pl-7 pr-3 text-right text-sm font-semibold text-slate-500 outline-none" type="number" step="0.01" min="0" readonly asp-for="NewRecord.BE" title="Auto-loaded from SBE (sum of NBE for the selected Scheme)" />
+                            </div>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                <p class="text-[10px] font-bold tracking-wide text-slate-500"><span id="iiiBalanceOpeningLabel">CNA</span> Balance as on 1-Apr @Model.PriorFinancialYear?.Split('-').Last().Trim() <span class="text-red-500">*</span></p>
+                            <div class="relative mt-2">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" asp-for="NewRecord.BalanceAsOnAprilOpening" />
+                            </div>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                <p class="text-[10px] font-bold tracking-wide text-slate-500">Releases during @Model.PriorFinancialYear till 30-Sept @Model.PriorFinancialYear?.Split('-').Last().Trim() <span class="text-red-500">*</span></p>
+                            <div class="relative mt-2">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" asp-for="NewRecord.ReleasesDuringFY" />
+                            </div>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                <p class="text-[10px] font-bold tracking-wide text-slate-500"><span id="iiiBalanceClosingLabel">CNA</span> Balance as on 30-Sept @Model.PriorFinancialYear?.Split('-').Last().Trim() <span class="text-red-500">*</span></p>
+                            <div class="relative mt-2">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-800 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" asp-for="NewRecord.BalanceAsOnSeptClosing" />
+                            </div>
+                        </div>
+                        <div data-balance-field="not-transferred" class="rounded-xl border border-slate-200 bg-slate-50 p-3 md:col-span-2">
+                                <p class="text-[10px] font-bold tracking-wide text-slate-500">Central release lying in State Treasury but not transferred to SNA Account as on 30-Sept @Model.PriorFinancialYear?.Split('-').Last().Trim() <span class="text-red-500">*</span></p>
+                            <div class="relative mt-2">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" asp-for="NewRecord.NotTransferredToSnaAsOnSept" />
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section data-balance-section="financial" class="mb-4 rounded-xl border border-slate-200 bg-white">
+                    <div class="grid pt-4 pl-3 md:grid-cols-1">
+                        <h3 class="text-sm font-bold text-slate-800">Last Release</h3>
+                    </div>
+                    <div class="grid gap-3 p-4 md:grid-cols-2">
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold  tracking-wide text-slate-500">Date of Last Release <span class="text-red-500">*</span></p>
+                            <input class="mt-2 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="date" max="@DateTime.Today.ToString("yyyy-MM-dd")" asp-for="NewRecord.DateOfLastRelease" />
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p class="text-[10px] font-bold  tracking-wide text-slate-500">Amount of Last Release <span class="text-red-500">*</span></p>
+                            <div class="relative mt-2">
+                                <span class="absolute left-3 top-2.5 text-xs font-semibold text-slate-400">₹</span>
+                                <input class="NumericData tabular h-10 w-full rounded-lg border border-slate-300 bg-white pl-7 pr-3 text-right text-sm font-semibold text-slate-700 outline-none focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" type="number" step="0.01" min="0" asp-for="NewRecord.AmountOfLastRelease" />
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Exemption Details - "Schemes exempted from CNA"/"Schemes exempted from SNA" only
+                     (client screenshot 2026-09-09: Category(CNA/SNA) + Reason For Exemption, no
+                     numeric balance fields at all). The Category shown here is read-only - it's
+                     already exactly what the Balance Type selection above says, not a second,
+                     independently-editable choice. -->
+                <section data-balance-section="exemption" class="mb-4 hidden rounded-xl border border-slate-200 bg-white">
+                    <div class="grid pt-4 pl-3 md:grid-cols-1">
+                        <h3 class="text-sm font-bold text-slate-800">Exemption Details</h3>
+                    </div>
+                    <div class="grid gap-3 p-4 md:grid-cols-2">
+                            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 hidden">
+                            <p class="text-[10px] font-bold tracking-wide text-slate-500">Category (CNA/SNA)</p>
+                            <input id="iiiExemptionCategoryDisplay" class="mt-2 h-10 w-full rounded-lg border border-slate-300 bg-slate-100 px-3 text-xs font-semibold text-slate-500 outline-none" type="text" readonly tabindex="-1" />
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 md:col-span-2">
+                            <p class="text-[10px] font-bold tracking-wide text-slate-500">Reason For Exemption <span class="text-red-500">*</span></p>
+                            <textarea class="mt-2 w-full resize-none rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-ubis-teal focus:ring-4 focus:ring-teal-50" maxlength="500" rows="4" placeholder="Enter reason for exemption..." asp-for="NewRecord.ReasonForExemption"></textarea>
+                        </div>
+                    </div>
+                </section>
+
+                    
+
+            </div>
+
+            <div class="flex shrink-0 items-center justify-end border-t border-slate-200 bg-white px-5 py-3.5">
+                <div class="flex items-center gap-2">
+                    <button type="reset" id="appendixIIIReset" class="h-9 rounded-lg border border-ubis-navy px-3.5 text-xs font-semibold text-ubis-navy hover:bg-blue-50">Clear</button>
+                    <button type="button" data-action="close-appendix-iii-drawer" class="h-9 rounded-lg border border-slate-300 px-3.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>                    
+                    <button type="submit" class="h-9 rounded-lg bg-ubis-teal px-4 text-xs font-bold text-white shadow-sm hover:bg-teal-700">Save Record</button>
+                </div>
+            </div>
+            </fieldset>
+        </form>
+    </aside>
+
+    <!-- Toast -->
+    <div id="iiiToast" class="ubis-toast-hide ubis-toast-success fixed bottom-5 right-5 z-[100] flex w-[calc(100%-2rem)] max-w-sm items-start gap-3 rounded-xl border bg-white p-4 shadow-2xl transition-all duration-300" aria-live="polite" aria-atomic="true">
+        <div class="ubis-toast-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-full">
+            <i id="iiiToastIcon" data-lucide="check-circle-2" class="h-4 w-4"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+            <p id="iiiToastTitle" class="text-xs font-bold text-slate-800">Success</p>
+            <p id="iiiToastMessage" class="mt-0.5 text-[11px] text-slate-500"></p>
+        </div>
+        <button id="iiiToastClose" type="button" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-4 focus:ring-slate-100" aria-label="Close notification"><i data-lucide="x" class="h-4 w-4"></i></button>
+    </div>
+
+    <!-- Delete confirmation dialog -->
+    <div id="iiiDeleteDialog" class="ubis-dialog-hide fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px] transition-opacity duration-200" role="dialog" aria-modal="true" aria-labelledby="iiiDeleteDialogTitle" aria-hidden="true">
+        <div class="ubis-dialog-card w-full max-w-md rounded-2xl border border-red-100 bg-white p-5 shadow-2xl transition-all duration-200">
+            <div class="flex items-start gap-4">
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                    <i data-lucide="trash-2" class="h-5 w-5"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <h2 id="iiiDeleteDialogTitle" class="text-base font-bold text-slate-900">Delete</h2>
+                    <p class="mt-1 text-sm leading-5 text-slate-500">Are you sure you want to delete?</p>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end gap-2">
+                <button id="iiiCancelDeleteBtn" type="button" class="h-10 rounded-lg border border-slate-300 px-4 text-xs font-bold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100">Cancel</button>
+                <button id="iiiConfirmDeleteBtn" type="button" class="inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-100"><i data-lucide="trash-2" class="h-4 w-4"></i>Delete record</button>
+            </div>
+        </div>
+    </div>
+</div>

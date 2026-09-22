@@ -1,0 +1,35 @@
+@using Microsoft.Extensions.Options
+@using UBIS.Web.Configuration
+@using UBIS.Web.Services.Session
+@inject IOptions<AdminRoleOptions> AdminRoleOptions
+@{
+    var fullName = User.FindFirst("FullName")?.Value ?? User.Identity?.Name ?? string.Empty;
+    var roleName = User.FindFirst("RoleName")?.Value ?? string.Empty;
+    var initials = string.Concat(fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => char.ToUpperInvariant(p[0])));
+    // Added 2026-07: admin-only link to the pending change-requests / session-settings screens.
+    // Rewritten 2026-07-13: gate on RoleId (real dbo.M_Role) instead of the earlier invented
+    // AIM:UserAdmin:R claim.
+    var isAdmin = Context.Session.GetUbisSession()?.IsAdmin(AdminRoleOptions.Value.AdminRoleIds) ?? false;
+}
+<details class="relative">
+    <summary class="flex cursor-pointer list-none items-center gap-2 rounded-lg p-1 hover:bg-cyan-50 dark:hover:bg-slate-900">
+        <span class="hidden text-right text-xs sm:block">
+            <b>@fullName</b><br />
+            <span id="userMenuRoleName" class="text-slate-500">(@(string.IsNullOrEmpty(roleName) ? "Loading…" : roleName))</span>
+        </span>
+        <span class="grid h-9 w-9 place-items-center rounded-full bg-navy text-sm font-black text-white">@initials</span>
+    </summary>
+    <div class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+        <a class="menu-pop" asp-area="" asp-controller="UserProfile" asp-action="Index"><i data-lucide="user-round"></i> My Profile</a>
+        <a class="menu-pop" asp-area="" asp-controller="User" asp-action="ChangePassword"><i data-lucide="key-round"></i> Change Password</a>
+        @if (isAdmin)
+        {
+            <a class="menu-pop" asp-area="" asp-controller="Admin" asp-action="PendingRequests"><i data-lucide="shield-check"></i> Pending Requests</a>
+            <a class="menu-pop" asp-area="" asp-controller="Admin" asp-action="ActiveSessions"><i data-lucide="activity"></i> Active Sessions</a>
+        }
+        <form asp-area="" asp-controller="User" asp-action="Logout" method="post">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="menu-pop w-full text-left"><i data-lucide="log-out"></i> Logout</button>
+        </form>
+    </div>
+</details>

@@ -1,0 +1,14 @@
+@model UBIS.Web.Areas.PreBudgetMeeting.Models.AppendixBaseViewModel
+@*
+    Appendix-level permission alert (VII-A/VII-B/XI/PA-ReceiptPayment framework). Shown only when
+    the caller's role lacks CanCreate/CanEdit on this appendix (Model.HasEntryPermission is false) -
+    see AppendixPermissionService (PreBudget microservice) and
+    PreBudgetMeetingController.ApplyAppendixPermissionsAsync. Every other appendix's ViewModel
+    defaults these flags to true, so this partial renders nothing for them.
+*@
+@if (!Model.HasEntryPermission)
+{
+    <div class="mx-5 mt-4 rounded border p-4 text-sm" style="background-color:#eff6ff;border-color:#bfdbfe;color:#1e40af" role="alert">
+        You do not have permission to enter data for this template, so data cannot be entered.
+    </div>
+}

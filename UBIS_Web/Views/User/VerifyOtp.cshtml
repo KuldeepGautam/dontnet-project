@@ -1,0 +1,72 @@
+@model VerifyOtpViewModel
+@{
+    Layout = null;
+}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#063f66">
+    <title>Verify your identity | Union Budget Information System</title>
+    <link rel="stylesheet" href="~/css/styles.css" asp-append-version="true">
+    <link rel="stylesheet" href="~/css/login.css" asp-append-version="true">
+    <script src="~/vendor/lucide.min.js" defer></script>
+</head>
+<body class="login-body">
+    <main class="verify-page">
+        <section class="verify-modal" role="dialog" aria-labelledby="verifyTitle" aria-describedby="verifyDescription">
+            <header class="modal-header">
+                <div>
+                    <h2 id="verifyTitle">Verify your identity</h2>
+                    <p id="verifyDescription">A one-time code has been sent to your registered contact. Enter it below to finish signing in.</p>
+                </div>
+            </header>
+            <div class="modal-body">
+                @* Method switcher (added 2026-07-22): only Email is actually wired to AIM's OTP
+                   delivery today. Phone is shown for forward compatibility (per Mfa:PhoneOtpEnabled)
+                   but stays disabled until a real SMS gateway is provisioned — see
+                   NotConfiguredSmsServiceClient in AIM for the matching backend-side placeholder. *@
+                <div class="method-switch" aria-label="Verification method">
+                    <button class="method is-active" type="button" data-method="email" aria-pressed="true">
+                        <i data-lucide="mail" style="width:16px;height:16px;" aria-hidden="true"></i> Email
+                    </button>
+                    <button class="method" type="button" data-method="phone"
+                            disabled="@(!Model.PhoneOtpEnabled ? "disabled" : null)"
+                            title="@(Model.PhoneOtpEnabled ? "Verify via SMS" : "Phone verification is not yet available — no SMS gateway is configured.")">
+                        <i data-lucide="smartphone" style="width:16px;height:16px;" aria-hidden="true"></i> Phone
+                    </button>
+                </div>
+
+                <p id="verifyInfo" class="info" role="status">@Model.InfoMessage</p>
+                <p id="verifyError" class="error" role="alert">@Model.ErrorMessage</p>
+
+                <form id="verifyForm" asp-controller="User" asp-action="VerifyOtp" method="post" novalidate>
+                    @Html.AntiForgeryToken()
+                    <div asp-validation-summary="ModelOnly" class="error"></div>
+
+                    <div class="verify-field">
+                        <label asp-for="Otp">Verification code</label>
+                        <input asp-for="Otp" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="Enter 6-digit code" required>
+                        <span asp-validation-for="Otp" class="error"></span>
+                    </div>
+
+                    <div class="modal-actions">
+                        <a asp-controller="User" asp-action="Login" class="cancel">Cancel</a>
+                        <button class="confirm" type="submit">Verify and continue</button>
+                    </div>
+                </form>
+
+                <form id="resendForm" asp-controller="User" asp-action="ResendOtp" method="post" class="modal-actions" style="justify-content:flex-start;margin-top:14px;">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="resend">Resend code</button>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/verify-otp.js" asp-append-version="true"></script>
+</body>
+</html>

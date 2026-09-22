@@ -1,0 +1,50 @@
+{
+  "info": {
+    "name": "SaveUsersDev",
+    "description": "Dev-only API to seed M_Users. POST /api/SaveUserName looks up role_name in M_Role; if missing returns 400 'Role not found', else hashes the plain-text password with BCrypt (factor 12, same as AIM's AuthenticationService) and inserts into M_Users with the resolved RoleId.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://localhost:5001" }
+  ],
+  "item": [
+    {
+      "name": "SaveUserName - success (role exists)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"jdoe\",\n  \"password\": \"P@ssw0rd\",\n  \"email_address\": \"jdoe@test.com\",\n  \"role_name\": \"Admin\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/SaveUserName",
+          "host": [ "{{baseUrl}}" ],
+          "path": [ "api", "SaveUserName" ]
+        },
+        "description": "username -> M_Users.UserName (unique)\npassword -> plain text in, BCrypt-hashed before storing\nemail_address -> M_Users.EmailAddress\nrole_name -> must exist in M_Role.RoleName (seeded: Admin, User)"
+      }
+    },
+    {
+      "name": "SaveUserName - role not found",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"jdoe2\",\n  \"password\": \"P@ssw0rd\",\n  \"email_address\": \"jdoe2@test.com\",\n  \"role_name\": \"DoesNotExist\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/SaveUserName",
+          "host": [ "{{baseUrl}}" ],
+          "path": [ "api", "SaveUserName" ]
+        },
+        "description": "role_name does not exist in M_Role -> expect 400 { \"error\": \"Role not found\" }"
+      }
+    }
+  ]
+}

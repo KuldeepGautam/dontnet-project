@@ -1,0 +1,1002 @@
+:root {
+  --page-wash: #f4f9fc;
+  --login-card-max: 720px;
+}
+
+/* =========================================================
+   UBIS LOGIN — Responsive layout
+   Desktop / Laptop / Tablet / Mobile / Landscape
+   ========================================================= */
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  color: var(--ubis-ink);
+  background: var(--page-wash);
+  height: 100%;
+}
+
+.login-page {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(460px, 0.88fr);
+  overflow: hidden;
+}
+
+.visual-panel {
+  position: relative;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #78906d;
+}
+
+/* A real <img class="visual-panel-image"> (see Login.cshtml), not a CSS background-image - kept
+   from the previous login.css: it makes the picture an ordinary scaling element on the page, so
+   it zooms in/out together with the form and the rest of the content instead of browser zoom
+   occasionally leaving a background-image's cover-fit looking static/mismatched. */
+.visual-panel-image {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.visual-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(3, 25, 39, 0.04),
+    rgba(3, 25, 39, 0.25)
+  );
+  pointer-events: none;
+}
+
+.form-panel {
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  /* "safe center" (client report 2026-09-01: Login button pushed out of view on shorter laptop
+     screens): plain "center" still centers a card that's taller than the panel, which makes it
+     overflow equally top AND bottom - the default (unscrolled) view then shows a big empty gap
+     above the card while the Login button sits below the fold with no visible scroll cue. "safe
+     center" keeps the nice centered look whenever the card actually fits (typical desktop
+     monitor), but automatically falls back to top-alignment the moment it doesn't fit, so any
+     overflow lands entirely at the bottom - reachable by the ordinary "scroll down" instinct
+     instead of being split invisibly across both ends. */
+  align-items: safe center;
+  justify-content: center;
+  padding: clamp(8px, 1.2vh, 20px) clamp(18px, 3vw, 42px);
+  background: linear-gradient(135deg, #f8fcff, #edf6fb);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.login-card {
+  width: min(100%, var(--login-card-max));
+  min-width: 0;
+  min-height: 75%;
+  /* Reverted to the original designer padding 2026-09-07 per explicit instruction, copied from
+     the untracked root-level login.css - user confirmed this after being told it reintroduces the
+     685781f "Login button cut off on shorter laptop screens" bug (that fix trimmed padding-top to
+     5px specifically so the button stays visible without scrolling on ~1366x768 laptops). The
+     2026-09-03 ragged-alignment fix (restoring left/right/bottom padding, ex-685781f had zeroed
+     them) is still in effect via this same shorthand - only the top value changes back. */
+  padding: clamp(20px, 2.2vw, 32px) clamp(18px, 3vw, 38px) 30px;
+  border-radius: clamp(20px, 2vw, 32px);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 18px 44px rgba(6, 63, 102, 0.08);
+}
+
+/* Government identity */
+.identity {
+  display: flex;
+  align-items: center;
+  gap: clamp(14px, 2vw, 24px);
+  padding: 0 0 10px;
+  min-width: 0;
+}
+
+.seal {
+  width: clamp(76px, 9vw, 128px);
+  height: clamp(76px, 9vw, 128px);
+  flex: 0 0 clamp(76px, 9vw, 128px);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #f1f1f1;
+}
+
+.seal img {
+  width: clamp(42px, 5vw, 68px);
+  max-width: 72%;
+  height: auto;
+}
+
+.identity > div:last-child {
+  min-width: 0;
+}
+
+.identity h1,
+.identity p {
+  margin: 0;
+  font-weight: 500;
+  color: #090909;
+  line-height: 1.18;
+  overflow-wrap: anywhere;
+}
+
+.identity h1 {
+  font-size: clamp(1.3rem, 2vw, 2rem);
+}
+
+.identity p {
+  margin-bottom: 4px;
+  font-size: clamp(1.1rem, 1.65vw, 1.65rem);
+}
+
+/* Department block */
+.department {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 2vw, 20px);
+  width: 100%;
+  min-width: 0;
+  min-height: 138px;
+  padding: clamp(8px, 1.2vw, 16px);
+  border: 1px solid #bfeaf0;
+  border-radius: 15px;
+  box-shadow: var(--ubis-shadow-md);
+}
+
+.department img {
+  width: clamp(145px, 34%, 245px);
+  max-width: 42%;
+  height: auto;
+  flex: 0 1 auto;
+  object-fit: contain;
+}
+
+.department-copy {
+  min-width: 0;
+  padding-left: clamp(10px, 1.5vw, 20px);
+  border-left: 1px solid #e5eef3;
+  color: var(--ubis-muted);
+  font-size: clamp(0.76rem, 1vw, 0.9rem);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.department-copy strong {
+  display: block;
+  color: #627692;
+  font-weight: 800;
+}
+
+/* Form */
+.login-form {
+  width: 100%;
+  min-width: 0;
+  margin-top: 35px;
+}
+
+/* Fades the form itself while #loginStatus (styles.css's shared .ubis-loading-overlay) is
+   showing on top of it - login.js's setLoading() toggles both. Kept from the previous
+   login.css. */
+.login-form.is-loading {
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  margin-top: 14px;
+}
+
+.field label,
+.captcha-title {
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.025em;
+  color: #60728d;
+  text-transform: uppercase;
+}
+
+.required {
+  color: #dc2626;
+}
+
+.input-wrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.input-wrap input,
+.captcha-entry {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  border: 1px solid #cad9e5;
+  border-radius: 12px;
+  background: #fbfdff;
+  padding: 0 44px 0 14px;
+  color: #304055;
+  outline: none;
+}
+
+.input-wrap input:focus,
+.captcha-entry:focus {
+  border-color: var(--ubis-teal);
+  box-shadow: 0 0 0 4px rgba(6, 174, 184, 0.12);
+}
+
+/* Report 2026-09-03 ("textbox backcolor is changed... designer's are white"): the designer
+   mockup (UBIS-Prototype/assets/login.css) uses this exact same #fbfdff background - pixel-
+   sampled identical to ours - so the static CSS was never actually different. The real-world
+   cause is browser autofill: once Chrome/Edge has a saved credential for this form, it repaints
+   Username/Password with its own yellow/blue autofill background, which simply overrides the
+   CSS `background` property outright - a static mockup with a hardcoded value="..." never
+   triggers real autofill, so it never shows this. Forcing the fill color back via a huge
+   transition-delay (the standard workaround - Webkit/Blink don't support overriding autofill's
+   internal background directly) keeps every input showing the intended white/off-white
+   regardless of what the browser's password manager tries to paint over it. */
+.input-wrap input:-webkit-autofill,
+.input-wrap input:-webkit-autofill:hover,
+.input-wrap input:-webkit-autofill:focus,
+.captcha-entry:-webkit-autofill,
+.captcha-entry:-webkit-autofill:hover,
+.captcha-entry:-webkit-autofill:focus {
+  border: 1px solid #cad9e5;
+  -webkit-text-fill-color: #304055;
+  -webkit-box-shadow: 0 0 0 1000px #fbfdff inset;
+  box-shadow: 0 0 0 1000px #fbfdff inset;
+  transition: background-color 600000s ease-in-out 0s;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #667b97;
+  cursor: pointer;
+}
+
+/* Captcha */
+.captcha-box {
+  width: 100%;
+  min-width: 0;
+  margin-top: 10px;
+  padding: clamp(8px, 1vw, 12px);
+  border: 1px solid #dce7ef;
+  border-radius: 15px;
+  background: rgba(248, 251, 253, 0.9);
+}
+
+.captcha-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.captcha-code {
+  flex: 1 1 140px;
+  min-width: 110px;
+  padding: 9px 12px;
+  border: 1px dashed #4bd7e7;
+  border-radius: 11px;
+  background: #fff;
+  color: #5e7089;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-align: center;
+}
+
+.refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  gap: 7px;
+  min-height: 42px;
+  border: 1px solid #dbe5ef;
+  border-radius: 11px;
+  background: #fff;
+  padding: 8px 12px;
+  color: var(--ubis-navy);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.captcha-box .field {
+  margin-top: 8px;
+}
+
+.forgot {
+  display: inline-block;
+  margin: 10px 0;
+  color: var(--ubis-navy);
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-decoration: none;
+  background:transparent;
+  border:0px;
+  cursor:pointer;
+}
+
+.login-submit {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  border-radius: 13px;
+  background: #084b75;
+  color: #fff;
+  box-shadow: 0 8px 16px rgba(6, 63, 102, 0.18);
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.login-submit:hover {
+  background: var(--ubis-navy-deep);
+  transform: translateY(-1px);
+}
+
+/* .login-page prefix is load-bearing, not decoration (kept from the previous login.css):
+   styles.css (loaded on every page, including this one) has its own unrelated ".field span" rule
+   (a totally different form-field component that happens to share the ".field" class name) which
+   sets color:var(--ubis-muted) + text-transform:uppercase with specificity (0,1,1) - higher than
+   a bare ".error"/".field-validation-error" (0,1,0), so it was silently winning and rendering
+   "Username is required." in gray/uppercase instead of red regardless of source order. Every rule
+   below that needs to win against that collision is scoped under .login-page (0,2,0) to reliably
+   beat it.
+
+   display:block is load-bearing too: these are <span> elements, and min-height has NO EFFECT on
+   inline elements - without this, an empty span collapses to 0 height regardless of min-height,
+   so the Password field/CAPTCHA/Login button would shift up when an error message disappears and
+   back down when one appears.
+
+   order:3 is load-bearing too, and fixes a real bug: styles.css's ".field span { order: 1 }" /
+   ".field input { order: 2 }" only ever mattered for Username/Password because their <input> sits
+   inside an extra <div class="input-wrap"> - a non-span direct child of .field with no order set,
+   so it naturally sorts before the (order:1) error span regardless. CAPTCHA's <input> has no such
+   wrapper, so it's a direct .field child and picks up order:2 itself, while BOTH the "Captcha *"
+   title and the error message are <span>s that pick up order:1 - putting the error ABOVE the
+   input instead of below it. order:3 here (higher specificity than styles.css's (0,1,1) rule)
+   forces the error to sort after the input no matter what order the other siblings land in. */
+.login-page .error,
+.login-page .field-validation-error {
+  display: block;
+  order: 3;
+  min-height: 19px;
+  margin: 6px 0 0;
+  color: #dc2626;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: none;
+}
+
+/* Forgot-password dialog's status/info message (#forgotPasswordInfo) - kept from the previous
+   login.css. */
+.info {
+  margin: 0;
+  color: orangered;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.info:not(:empty) {
+  min-height: 19px;
+  margin: 8px 0 0;
+}
+
+/* =========================================================
+   Verification modal — responsive
+   ========================================================= */
+.modal-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(12px, 3vw, 24px);
+  background: rgba(5, 32, 49, 0.56);
+  opacity: 0;
+  pointer-events: none;
+  overflow-y: auto;
+  transition: opacity 180ms ease;
+}
+
+.modal-backdrop.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Used only when force-closing the OTHER dialog as a side effect of opening this one (login.js's
+   openChangePasswordDialog/forgot-password.js) - without this, that dialog's opacity 1->0 fade
+   runs at the same time as this one's 0->1 fade, and for that overlapping ~180ms window both are
+   partially visible, cross-fading into each other. Kept from the previous login.css. */
+.modal-backdrop.no-transition {
+  transition: none !important;
+}
+
+.verify-modal {
+  width: min(100%, 420px);
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: var(--ubis-shadow-lg);
+  transform: translateY(12px) scale(0.98);
+  transition: transform 180ms ease;
+}
+
+.is-open .verify-modal {
+  transform: translateY(0) scale(1);
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 22px 24px 15px;
+  border-bottom: 1px solid #edf1f5;
+}
+
+.modal-header > div {
+  min-width: 0;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: var(--ubis-navy);
+  font-size: 1.35rem;
+  line-height: 1.25;
+}
+
+.modal-header p {
+  margin: 5px 0 0;
+  color: var(--ubis-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.close-modal {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 9px;
+  background: #f3f7fa;
+  color: var(--ubis-copy);
+  cursor: pointer;
+}
+
+.modal-body {
+  padding: 20px 24px 24px;
+}
+
+.method-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #eef5f8;
+}
+
+.method {
+  border: 0;
+  border-radius: 9px;
+  padding: 10px;
+  background: transparent;
+  color: var(--ubis-copy);
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.method.is-active {
+  background: #fff;
+  color: var(--ubis-navy);
+  box-shadow: 0 2px 7px rgba(6, 63, 102, 0.09);
+}
+
+.verify-field {
+  min-width: 0;
+  margin-top: 18px;
+}
+
+.verify-field label {
+  display: block;
+  margin-bottom: 7px;
+  color: #60728d;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+.verify-field input {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid #cad9e5;
+  border-radius: 12px;
+  padding: 0 13px;
+  outline: none;
+}
+
+.verify-field input:focus {
+  border-color: var(--ubis-teal);
+  box-shadow: 0 0 0 4px rgba(6, 174, 184, 0.12);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.modal-actions button {
+  min-height: 42px;
+  border-radius: 11px;
+  padding: 0 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.cancel {
+  border: 1px solid #d5e0e8;
+  background: #fff;
+  color: var(--ubis-copy);
+}
+
+.confirm {
+  border: 0;
+  background: var(--ubis-navy);
+  color: #fff;
+}
+
+.otp {
+  border: 0;
+  background: #dce7ef;
+  color: var(--ubis-navy);
+}
+
+/* =========================================================
+   Laptop
+   ========================================================= */
+@media (max-width: 1366px) {
+  .login-page {
+    grid-template-columns: minmax(0, 1fr) minmax(430px, 0.92fr);
+  }
+
+  .form-panel {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+
+  .login-card {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+
+  .department {
+    min-height: 100px;
+  }
+
+  .seal {
+    width: 64px;
+    height: 64px;
+    flex-basis: 64px;
+  }
+
+  .seal img {
+    width: 38px;
+  }
+}
+
+/* =========================================================
+   Small laptop / large tablet
+   ========================================================= */
+@media (max-width: 1100px) {
+  .login-page {
+    grid-template-columns: minmax(300px, 0.82fr) minmax(430px, 1.18fr);
+  }
+
+  .form-panel {
+    padding: 24px 22px;
+  }
+
+  .login-card {
+    padding: 22px;
+  }
+
+  .seal {
+    width: 92px;
+    height: 92px;
+    flex-basis: 92px;
+  }
+
+  .seal img {
+    width: 52px;
+  }
+
+  .identity h1 {
+    font-size: 1.55rem;
+  }
+
+  .identity p {
+    font-size: 1.25rem;
+  }
+
+  .department img {
+    width: 185px;
+  }
+}
+
+/* =========================================================
+   Tablet portrait
+   Avoid a cramped two-column layout.
+   ========================================================= */
+@media (max-width: 900px) {
+  .login-page {
+    display: block;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .visual-panel {
+    min-height: 230px;
+    height: 28%;
+    max-height: 280px;
+  }
+
+  .form-panel {
+    height: 72%;
+    padding: 28px 24px 36px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .login-card {
+    width: min(100%, 680px);
+  }
+}
+
+/* =========================================================
+   Mobile
+   ========================================================= */
+@media (max-width: 600px) {
+  .login-page {
+    min-width: 0;
+  }
+
+  .visual-panel {
+    height: 22%;
+    min-height: 120px;
+    max-height: 220px;
+    background-position: center;
+  }
+
+  .form-panel {
+    height: 78%;
+    padding: 16px 12px 24px;
+    align-items: flex-start;
+  }
+
+  .login-card {
+    width: 100%;
+    padding: 18px 15px 22px;
+    border-radius: 20px;
+  }
+
+  .identity {
+    gap: 12px;
+    padding-bottom: 15px;
+  }
+
+  .seal {
+    width: 66px;
+    height: 66px;
+    flex-basis: 66px;
+  }
+
+  .seal img {
+    width: 38px;
+  }
+
+  .identity h1 {
+    font-size: 1.25rem;
+  }
+
+  .identity p {
+    font-size: 1rem;
+  }
+
+  .department {
+    align-items: center;
+    min-height: 0;
+    padding: 11px;
+    gap: 10px;
+    border-radius: 12px;
+  }
+
+  .department img {
+    width: 43%;
+    max-width: 43%;
+  }
+
+  .department-copy {
+    padding-left: 10px;
+    font-size: 0.7rem;
+    line-height: 1.4;
+  }
+
+  .login-form {
+    margin-top: 20px;
+  }
+
+  .field {
+    margin-top: 15px;
+  }
+
+  .input-wrap input,
+  .captcha-entry {
+    min-height: 46px;
+  }
+
+  .captcha-box {
+    margin-top: 16px;
+    padding: 11px;
+  }
+
+  .captcha-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .captcha-code {
+    width: 100%;
+    min-width: 0;
+    padding: 9px 8px;
+  }
+
+  .refresh {
+    min-height: 42px;
+    padding: 8px 10px;
+  }
+
+  .forgot {
+    margin: 15px 0;
+    font-size: 0.84rem;
+  }
+
+  .login-submit {
+    min-height: 48px;
+  }
+
+  .modal-backdrop {
+    padding: 10px;
+    align-items: center;
+  }
+
+  .verify-modal {
+    width: 100%;
+    max-height: calc(100dvh - 20px);
+    border-radius: 16px;
+  }
+
+  .modal-header {
+    padding: 18px 16px 13px;
+  }
+
+  .modal-header h2 {
+    font-size: 1.15rem;
+  }
+
+  .modal-header p {
+    font-size: 0.8rem;
+  }
+
+  .modal-body {
+    padding: 16px;
+  }
+
+  .modal-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .modal-actions button {
+    width: 100%;
+  }
+}
+
+/* =========================================================
+   Very small phones
+   ========================================================= */
+@media (max-width: 380px) {
+  .visual-panel {
+    height: 20%;
+    min-height: 100px;
+  }
+
+  .form-panel {
+    height: 80%;
+    padding: 10px 8px 18px;
+  }
+
+  .login-card {
+    padding: 15px 12px 18px;
+    border-radius: 16px;
+  }
+
+  .identity {
+    gap: 9px;
+  }
+
+  .seal {
+    width: 56px;
+    height: 56px;
+    flex-basis: 56px;
+  }
+
+  .seal img {
+    width: 32px;
+  }
+
+  .identity h1 {
+    font-size: 1.08rem;
+  }
+
+  .identity p {
+    font-size: 0.88rem;
+  }
+
+  .department {
+    padding: 9px;
+  }
+
+  .department-copy {
+    font-size: 0.64rem;
+  }
+
+  .captcha-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .refresh {
+    width: 100%;
+  }
+}
+
+/* =========================================================
+   Short laptop / tablet landscape
+   Keep the form usable without vertical clipping.
+   ========================================================= */
+@media (max-height: 720px) and (min-width: 901px) {
+  .form-panel {
+    align-items: flex-start;
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+
+  .login-card {
+    margin: auto 0;
+    padding-top: 18px;
+    padding-bottom: 20px;
+  }
+
+  .identity {
+    padding-bottom: 10px;
+  }
+
+  .seal {
+    width: 74px;
+    height: 74px;
+    flex-basis: 74px;
+  }
+
+  .seal img {
+    width: 42px;
+  }
+
+  .department {
+    min-height: 104px;
+    padding: 10px 14px;
+  }
+
+  .login-form {
+    margin-top: 14px;
+  }
+
+  .field {
+    margin-top: 12px;
+  }
+
+  .captcha-box {
+    margin-top: 12px;
+    padding: 10px;
+  }
+
+  .forgot {
+    margin: 10px 0;
+  }
+}
+
+@media (max-height: 600px) and (min-width: 601px) {
+  .visual-panel {
+    height: 100%;
+  }
+
+  .form-panel {
+    height: 100%;
+  }
+}
+
+/* Prevent iOS/Android browser zoom caused by small controls */
+@media (max-width: 600px) {
+  input,
+  button,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .field label,
+  .captcha-title,
+  .verify-field label {
+    font-size: 0.7rem;
+  }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

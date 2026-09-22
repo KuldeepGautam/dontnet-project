@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>UBIS.Services.Aim.WebApi</RootNamespace>
+    <AssemblyName>AIM.WebApi</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- WebApi layer depends on Infrastructure and Application -->
+    <ProjectReference Include="..\Infrastructure\AIM.Infrastructure.csproj" />
+    <ProjectReference Include="..\Application\AIM.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ASP.NET Core framework packages -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+
+    <!-- EF Core Tools (dotnet ef) require the *startup* project to reference this directly;
+         Infrastructure's copy is PrivateAssets=all so it doesn't flow through transitively. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

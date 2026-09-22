@@ -1,0 +1,246 @@
+@model UBIS.Web.Areas.PreBudgetMeeting.Models.AllocationViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Pre-budget - Add Allocation";
+    var todayIso = DateTime.Today.ToString("yyyy-MM-dd");
+}
+
+<style>
+    /* Client requirement 2026-09-01: native date inputs on this page were shrinking below the
+       width a browser needs to render its full dd-mm-yyyy value on narrow/small screens,
+       truncating the visible text (e.g. to "dd---yyyy"). Force a minimum width on every date
+       input on this page so the full value always stays visible, even inside a narrow grid cell. */
+    .allocation-date-input {
+        min-width: 140px;
+    }
+</style>
+
+<div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+    <p class="text-xs font-bold uppercase tracking-wide text-teal">@ViewData["Breadcrumb"]</p>
+    @* <h1 class="mt-1 text-xl font-black text-navy dark:text-white">Pre-budget - Add Allocation</h1>
+ *@
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <p id="allocationStatusMessage" class="mt-4 text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="status">@Model.StatusMessage</p>
+    }
+
+    @* Client requirement 2026-08-28 ("took too much time to load. load it immediately with
+         loader"): investigated and found the "Select Appendix" dropdown below was silently
+         non-functional - its onchange="window.location.href=..." attribute is inline script,
+         blocked outright by this app's CSP (script-src 'self', no unsafe-inline - same class of
+         bug already fixed once on this exact page for the inline <script> block). Nothing ever
+         happened when a user picked a different Appendix. Fixed by making it a real GET form
+         submit instead (name="appendixId" + data-auto-submit, the same site-wide
+         initAutoSubmitSelects() pattern already used by REDataRemarks.cshtml's own Appendix
+         filter) - this is also why the fix doubles as "load it immediately with loader": every
+         real <form> submit already triggers the site-wide navigation loader (see site.js's
+         initNavigationLoader), so this filter gets that for free once it's a real submit instead
+         of a silently-dead onchange. The <select> itself stays visually inside fieldset 1 below
+         (via the same form="" cross-association trick used for fieldset 3 further down) - this
+         empty form here is just its submission target, kept outside #allocationForm so it isn't
+         a <form> nested inside another <form> (illegal HTML, silently drops the inner tag). *@
+    <form id="appendixFilterForm" method="get" asp-action="REMeetingAllocation"></form>
+
+    <!-- Groupbox 1: Select Appendix. Standalone (submits via #appendixFilterForm, never a member
+         of #allocationForm's POST) - kept as its own fieldset, outside #allocationForm, so the
+         grid below can sit between it and the Select Demand checkboxes without needing another
+         <form>-splitting trick. -->
+    <fieldset class="mt-6 rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+        <legend class="px-1 text-xs font-black uppercase tracking-wide text-teal">Select Appendix</legend>
+        <div class="flex items-center gap-2" style="width:50%">
+           
+            <select class="input" style="width:100%" id="appendixId" name="appendixId"
+                    form="appendixFilterForm" data-auto-submit>
+                <option value="" selected="@(Model.SelectedAppendixId == null)">All</option>
+                @foreach (var appendix in Model.Appendixes)
+                {
+                    <option value="@appendix.AppendixId" selected="@(Model.SelectedAppendixId == appendix.AppendixId)">@appendix.Code - @appendix.Name</option>
+                }
+            </select>
+        </div>
+    </fieldset>
+
+    @*
+        Groupbox 2 (the grid, below) contains its own per-row "Edit" <form>s that POST to a
+        different action (UpdateAllocation). HTML forbids nesting a <form> inside another <form>
+        - a browser silently drops the inner <form> start tag and folds its inputs/buttons into
+        the OUTER form instead (confirmed live: the grid's per-row "Save" button and the page's
+        own "Submit" button both resolved as siblings of the same enclosing <form> until this
+        fix). So the single logical "SubmitAllocation" form only wraps the Select Demand fieldset
+        below the grid; the Email/SMS fieldset and Target Date/Submit block further down stay
+        tied to it via the standard HTML5 `form="allocationForm"` attribute (form-associated
+        elements need not be DOM descendants of their <form>).
+    *@
+    @if (Model.ExistingAllocations.Count > 0)
+        {
+            <!-- Groupbox 2: grid - client requirement: "Show grid above checkboxes, just below
+                 Select Demand Dropdown" (i.e. above the Send Email/SMS checkboxes, below Select
+                 Demand) and "If no data is in grid, hide it. and it any save made, show it." -
+                 hidden entirely server-side when empty, so it reappears the moment a save adds a
+                 row to Model.ExistingAllocations. -->
+            <fieldset class="mt-4 rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+                <legend class="px-1 text-xs font-black uppercase tracking-wide text-teal">Existing Allocations</legend>
+                @* Client requirement 2026-08-31 ("On grid entry, it should maintain table column
+                     structure, at present it is looking awkward"): the edit row used to cram every
+                     field into one <td colspan="5"> with flex-wrap, ignoring the table's real
+                     column boundaries entirely. A <form> can't be a direct child of <table>/
+                     <tbody> (browsers foster-parent it out, same problem as the earlier nested-
+                     <form> bug on this page), so each row's edit <form> is rendered just above the
+                     table - empty except for the antiforgery token and the two hidden fields - and
+                     every visible control lives in its own <td>, aligned under the matching header,
+                     tied back to that form via the same HTML5 form="" cross-association trick
+                     already used elsewhere on this page. *@
+                @foreach (var row in Model.ExistingAllocations)
+                {
+                    <form id="editForm-@row.DemandId" method="post" asp-action="UpdateAllocation" class="hidden">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="demandId" value="@row.DemandId" />
+                        <input type="hidden" name="appendixId" value="@Model.SelectedAppendixId" />
+                    </form>
+                }
+                <div class="overflow-x-auto">
+                    <table class="demo-table min-w-full text-sm">
+                        <thead>
+                            <tr>
+                                <th>Demand Name</th>
+                                <th>Target Date</th>
+                                <th>Frozen (Y/N)</th>
+                                <th>Nil Data</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.ExistingAllocations)
+                            {
+                                <tr id="displayRow-@row.DemandId">
+                                    <td>@row.DemandNo - @row.DemandName</td>
+                                    <td>@(row.TargetDate?.ToString("dd-MM-yyyy") ?? "-")</td>
+                                    <td>@(row.IsFrozen ? "Yes" : "No")</td>
+                                    <td>@(row.IsNilSubmitted ? "Yes" : "No")</td>
+                                    <td>
+                                        <button type="button" class="table-icon-btn table-action-neutral" title="Edit"
+                                                data-action="edit-allocation-row" data-row-id="@row.DemandId">
+                                            <i data-lucide="pencil"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr id="editRow-@row.DemandId" class="hidden">
+                                    <td title="Demand cannot be reassigned - Delete/re-Allocate instead"><label>@row.DemandNo - @row.DemandName</label></td>
+                                    <td>
+                                        <input form="editForm-@row.DemandId" class="input allocation-date-input" style="width:100%" type="date" name="targetDate"
+                                               value="@(row.TargetDate?.ToString("yyyy-MM-dd"))" min="@todayIso" required />
+                                    </td>
+                                    <td>
+                                        <select form="editForm-@row.DemandId" class="input" style="width:100%" name="isFrozen">
+                                            <option value="false" selected="@(!row.IsFrozen)">No</option>
+                                            <option value="true" selected="@(row.IsFrozen)">Yes</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select form="editForm-@row.DemandId" class="input" style="width:100%" name="isNilSubmitted">
+                                            <option value="false" selected="@(!row.IsNilSubmitted)">No</option>
+                                            <option value="true" selected="@(row.IsNilSubmitted)">Yes</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <div class="flex gap-2">
+                                            <button form="editForm-@row.DemandId" type="submit" class="btn-primary">Save</button>
+                                            <button type="button" class="btn-secondary" data-action="cancel-allocation-edit" data-row-id="@row.DemandId">Cancel</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                @if (Model.TotalPages > 1)
+                {
+                    <!-- Client requirement 2026-08-28: "add 15 record pagination to grid" -->
+                    <div class="mt-3 flex flex-wrap items-center justify-center gap-2 text-sm">
+                        @for (var p = 1; p <= Model.TotalPages; p++)
+                        {
+                            var pageUrl = Url.Action("REMeetingAllocation", new { appendixId = Model.SelectedAppendixId, page = p });
+                            if (p == Model.Page)
+                            {
+                                <span class="rounded-lg bg-navy px-3 py-1 font-black text-white dark:bg-teal">@p</span>
+                            }
+                            else
+                            {
+                                <a href="@pageUrl" class="rounded-lg border border-slate-200 px-3 py-1 hover:bg-cyan-50 dark:border-slate-800 dark:hover:bg-slate-900">@p</a>
+                            }
+                        }
+                    </div>
+                }
+            </fieldset>
+        }
+
+    <!-- Groupbox 1 continued: Select Demand (client request 2026-08-28: "grid should show above
+         all checkboxes, just below select demand drop down") - the actual #allocationForm POST
+         target; everything below (Email/SMS, Target Date/Submit) stays tied to this same form via
+         form="allocationForm" even though it's no longer a DOM descendant of the <form> tag. -->
+    <form id="allocationForm" method="post" asp-action="SubmitAllocation" class="mt-6">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="AppendixId" value="@Model.SelectedAppendixId" />
+
+        <fieldset class="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+            <legend class="px-1 text-xs font-black uppercase tracking-wide text-teal">Select Demand</legend>
+            <div>
+                <label class="mr-2 text-sm"><input type="checkbox" id="selectAllDemands" /> Select All Demands</label>
+            </div>
+            <div class="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-3 md:grid-cols-4">
+                @foreach (var demand in Model.Demands)
+                {
+                    <label class="text-sm"><input type="checkbox" class="demand-checkbox" name="DemandIds" value="@demand.DemandId" /> @demand.DemandNo | @demand.DemandName</label>
+                }
+            </div>
+        </fieldset>
+    </form>
+
+    @* Still logically part of #allocationForm (see the comment above that <form>, just above) -
+         every form-associated element from here down uses form="allocationForm" since it's no
+         longer a DOM descendant of the <form> tag itself. *@
+    <div class="mt-6">
+        <!-- Groupbox 3: Send Email/SMS To. Hidden per client request 2026-08-28 - the underlying
+             checkboxes/backend notification dispatch are untouched (still form-associated to
+             #allocationForm), just not shown; simply removing the "hidden" class below restores it
+             if the client wants it back, without needing to re-add any markup. -->
+        <fieldset class="hidden rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+            <legend class="px-1 text-xs font-black uppercase tracking-wide text-teal">Send Email / SMS to</legend>
+            <div class="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                <span class="text-xs font-semibold text-slate-500">Demand Users</span>
+                <span class="text-xs font-semibold text-slate-500">Budget, MOF Users</span>
+                <span>
+                    <label class="mr-2 text-sm">Budget Officer: <input form="allocationForm" type="checkbox" name="NotifyDemandBudgetOfficerEmail" value="true" /> Email <input form="allocationForm" type="checkbox" name="NotifyDemandBudgetOfficerSms" value="true" /> SMS</label>
+                </span>
+                <span>
+                    <label class="mr-2 text-sm">Budget Division Officer: <input form="allocationForm" type="checkbox" name="NotifyBudgetDivisionOfficerEmail" value="true" /> Email <input form="allocationForm" type="checkbox" name="NotifyBudgetDivisionOfficerSms" value="true" /> SMS</label>
+                </span>
+                <span>
+                    <label class="mr-2 text-sm">CCA: <input form="allocationForm" type="checkbox" name="NotifyDemandCcaEmail" value="true" /> Email <input form="allocationForm" type="checkbox" name="NotifyDemandCcaSms" value="true" /> SMS</label>
+                </span>
+                <span>
+                    <label class="mr-2 text-sm">Section User: <input form="allocationForm" type="checkbox" name="NotifySectionUserEmail" value="true" /> Email <input form="allocationForm" type="checkbox" name="NotifySectionUserSms" value="true" /> SMS</label>
+                </span>
+                <span>
+                    <label class="mr-2 text-sm">FA: <input form="allocationForm" type="checkbox" name="NotifyDemandFaEmail" value="true" /> Email <input form="allocationForm" type="checkbox" name="NotifyDemandFaSms" value="true" /> SMS</label>
+                </span>
+            </div>
+        </fieldset>
+
+        <div class="mt-4 flex items-center gap-2">
+            <label class="whitespace-nowrap text-sm font-semibold" for="targetDate">Target Date</label>
+            <input form="allocationForm" class="input allocation-date-input" style="width:10rem" type="date" id="targetDate" name="TargetDate" min="@todayIso" required />
+            <button form="allocationForm" type="submit" class="btn-primary">Submit</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @* Must load before re-meeting-allocation.js - that file calls
+       window.PreBudgetControlBinding.initAllocationControls()/window.PreBudgetValidation.
+       initAllocationValidation() directly (no init() context needed - this is a plain
+       server-rendered page, not the Appendix AJAX-fragment SPA). *@
+    <script src="~/js/PreBudget-control-binding.js" asp-append-version="true"></script>
+    <script src="~/js/PreBudget-validation.js" asp-append-version="true"></script>
+    <script src="~/js/re-meeting-allocation.js" asp-append-version="true"></script>
+}

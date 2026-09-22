@@ -1,0 +1,182 @@
+﻿@model UBIS.Web.Areas.PreBudgetMeeting.Models.AutonomousMasterViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Autonomous Master for Appendix VI-C and VI-E";
+    var tempStatus = TempData["AutonomousMasterStatus"] as string;
+    var tempStatusIsError = TempData["AutonomousMasterStatusIsError"] as bool? ?? false;
+    var focusNameOnLoad = TempData["AutonomousMasterFocusName"] as bool? ?? false;
+    // Client requirement 2026-08-31: "For Single Demand User, there is only single demand so show
+    // in label not in dropdown, copy format from Appendixes page" - same Demands.Count == 1
+    // condition/markup shape as PreBudgetDataandReport.cshtml's own Single-Demand-User label.
+    var isSingleDemand = Model.Demands.Count == 1;
+}
+
+<section class="p-0 animate-fade-in">
+    <div class="flex flex-col gap-4 border-b border-slate-200 p-5 dark:border-slate-800 lg:flex-row lg:items-end lg:justify-between">
+        <p class="text-xs font-bold uppercase tracking-wide text-teal">@ViewData["Breadcrumb"]</p>
+    </div>
+
+    <div class="flex flex-col gap-4 border-b border-slate-200 p-5 dark:border-slate-800 lg:flex-row lg:items-end lg:justify-between">
+        <form method="get" asp-action="AutonomousMasterforAppendixVICandVIE" class="pre-budget-toolbar w-full">
+            <label class="table-toolbar-field" style="@(isSingleDemand ? "display:none" : null)">
+                <span>Demand</span>
+                <select name="demandId" class="input truncate" data-auto-submit aria-label="Select Demand">
+                    <option value="">Select Demand</option>
+                    @foreach (var demand in Model.Demands)
+                    {
+                        <option value="@demand.DemandId" selected="@(demand.DemandId == Model.SelectedDemandId ? "selected" : null)">@demand.DemandNo - @demand.DemandName</option>
+                    }
+                </select>
+            </label>
+            @if (isSingleDemand)
+            {
+                <div class="table-toolbar-field">
+                    <span>Demand</span>
+                    <span class="demand-pill">@Model.Demands[0].DemandNo - @Model.Demands[0].DemandName</span>
+                </div>
+            }
+        </form>
+    </div>
+
+    <p id="autonomousMasterStatusMessage" class="hidden" data-status="@tempStatus" data-status-is-error="@(tempStatusIsError ? "true" : "false")" data-focus-name="@(focusNameOnLoad ? "true" : "false")"></p>
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="pre-budget-status-bar">
+            <p class="text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="status">@Model.StatusMessage</p>
+        </div>
+    }
+
+    @if (Model.SelectedDemandId is not null)
+    {
+        <div class="overflow-x-auto p-5">
+            <h3 class="text-sm font-bold text-navy dark:text-white mb-2">Autonomous Bodies for this Demand</h3>
+            <table class="demo-table min-w-full text-sm">
+                <thead>
+                    <tr><th>Id</th><th>Code</th><th>Name</th></tr>
+                </thead>
+                <tbody>
+                    @if (Model.AutonomousBodies.Count == 0)
+                    {
+                        <tr><td colspan="3" class="empty-state-cell">No Autonomous Bodies configured for this Demand yet.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var ab in Model.AutonomousBodies)
+                        {
+                            <tr><td>@ab.AutonomousBodyId</td><td>@ab.Code</td><td>@ab.Name</td></tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (Model.CanReview)
+        {
+            <div class="border-t border-slate-200 dark:border-slate-800">
+                <div class="heading text-center heading-bg justify-between items-center px-4 py-3 text-white">
+                    Add Autonomous/Grantee Name
+                </div>
+                <form method="post" autocomplete="off" asp-action="CreateAutonomousBody" id="addAutonomousBodyForm" class="p-5 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    @Html.AntiForgeryToken()
+                    <div class="md:col-span-2">
+                        <label class="text-sm font-medium block mb-1">Select Demand</label>
+                        <select class="input" name="demandId" id="addAutonomousBodyDemandId" required>
+                            <option value="">-Select Demand-</option>
+                            @foreach (var demand in Model.Demands)
+                            {
+                                <option value="@demand.DemandId" selected="@(demand.DemandId == Model.SelectedDemandId ? "selected" : null)">@demand.DemandNo - @demand.DemandName</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium block mb-1">Autonomous/Grantee Name (English)</label>
+                        <input class="input" name="name" id="addAutonomousBodyName" data-field="Name" required maxlength="250" placeholder="e.g. National Institute of XYZ" autocomplete="off" />
+                        <span class="text-xs font-semibold text-red-600 hidden" id="addAutonomousBodyNameError">An Autonomous Body with this name already exists for this Demand.</span>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium block mb-1">Autonomous/Grantee Name (Hindi)</label>
+                        <input class="input" name="hName" id="addAutonomousBodyHName" data-field="HName" maxlength="250" autocomplete="off" />
+                        <span class="text-xs font-semibold text-red-600 hidden" id="addAutonomousBodyHNameError">An Autonomous Body with this Hindi name already exists for this Demand.</span>
+                    </div>
+                    <div class="md:col-span-2 flex justify-center gap-3 mt-2">
+                        <button type="submit" class="btn-primary"><i data-lucide="save"></i> Submit</button>
+                        <button type="reset" class="btn-secondary">Reset</button>
+                    </div>
+                </form>
+            </div>
+        }
+
+        @if (!Model.CanReview)
+        {
+            <!-- Client requirement 2026-08-31: "It should not request Autonomous Body, it should
+                 add it to use" - was a Request-it-for-approval form (RequestAutonomousBody, into
+                 the pending-requests queue below); now saves directly through the same
+                 CreateAutonomousBody action the Administrator's own Add form uses (server-side
+                 role gate widened accordingly - see AutonomousBodyCreatorRoleOptions). Name
+                 textbox is half width per the client's own spec; Save shows the standard dialogs.js
+                 modal (see autonomous-master.js) instead of an inline banner, then clears and
+                 refocuses the textbox for the next entry. -->
+            <div class="p-5 border-t border-slate-200 dark:border-slate-800">
+                <h3 class="text-sm font-bold text-navy dark:text-white mb-2">Add Autonomous/Grantee Name</h3>
+                <form method="post" autocomplete="off" asp-action="CreateAutonomousBody" id="addAutonomousBodyDirectForm" class="flex flex-col md:flex-row gap-2 md:items-end">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="demandId" value="@Model.SelectedDemandId" />
+                    <label class="table-toolbar-field" style="width:50%">
+                        <span>Autonomous Body Name</span>
+                        <input class="input" name="name" id="addAutonomousBodyDirectName" required placeholder="e.g. National Institute of XYZ" autocomplete="off" />
+                    </label>
+                    <button type="submit" class="btn-primary"><i data-lucide="save"></i> Save</button>
+                </form>
+            </div>
+        }
+
+        @if (Model.CanReview)
+        {
+            <div class="overflow-x-auto p-5 border-t border-slate-200 dark:border-slate-800">
+                <h3 class="text-sm font-bold text-navy dark:text-white mb-2">Pending Requests (Administrator)</h3>
+                <table class="demo-table min-w-full text-sm">
+                    <thead>
+                        <tr><th>Demand</th><th>Requested Name</th><th>Requested On</th><th>Review</th></tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.PendingRequests.Count == 0)
+                        {
+                            <tr><td colspan="4" class="empty-state-cell">No pending requests.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var req in Model.PendingRequests)
+                            {
+                                <tr>
+                                    <td>@req.DemandId</td>
+                                    <td>@req.RequestedName</td>
+                                    <td>@req.RequestedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td>
+                                        <form method="post" autocomplete="off" asp-action="ReviewAutonomousBodyRequest" class="flex flex-wrap gap-2 items-center">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="requestId" value="@req.RequestId" />
+                                            <input type="hidden" name="demandId" value="@Model.SelectedDemandId" />
+                                            <input class="input row-inline-inputsm" name="code" placeholder="Code" style="max-width:100px" />
+                                            <button type="submit" name="approve" value="true" class="table-icon-btn table-action-neutral" title="Approve"><i data-lucide="check"></i></button>
+                                            <button type="submit" name="approve" value="false" class="table-icon-btn table-action-danger" title="Reject"><i data-lucide="x"></i></button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+    else
+    {
+        <section class="pre-budget-placeholder">
+            <div class="pre-budget-placeholder-icon"><i data-lucide="building-2"></i></div>
+            <div><h3>Select a Demand</h3><p>Choose a Demand above to view or add Autonomous Bodies.</p></div>
+        </section>
+    }
+</section>
+
+@section Scripts {
+    <script src="~/js/autonomous-master.js" asp-append-version="true"></script>
+}

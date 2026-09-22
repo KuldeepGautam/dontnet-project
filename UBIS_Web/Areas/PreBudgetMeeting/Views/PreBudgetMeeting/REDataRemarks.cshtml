@@ -1,0 +1,99 @@
+﻿@model UBIS.Web.Areas.PreBudgetMeeting.Models.REDataRemarksViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "RE Data Remarks";
+}
+
+<section class="panel overflow-hidden p-0 animate-fade-in">
+    <div class="flex flex-col gap-4 border-b border-slate-200 p-5 dark:border-slate-800 lg:flex-row lg:items-end lg:justify-between">
+        <p class="text-xs font-bold uppercase tracking-wide text-teal">@ViewData["Breadcrumb"]</p>
+    </div>
+
+    <div class="flex flex-col gap-4 border-b border-slate-200 p-5 dark:border-slate-800 lg:flex-row lg:items-end lg:justify-between">
+        <form method="get" asp-action="REDataRemarks" class="pre-budget-toolbar w-full">
+            <label class="table-toolbar-field">
+                <span>Demand</span>
+                <select name="demandId" class="input truncate" data-auto-submit aria-label="Select Demand">
+                    <option value="">Select Demand</option>
+                    @foreach (var demand in Model.Demands)
+                    {
+                        <option value="@demand.DemandId" selected="@(demand.DemandId == Model.SelectedDemandId ? "selected" : null)">@demand.DemandNo - @demand.DemandName</option>
+                    }
+                </select>
+            </label>
+            @if (Model.SelectedDemandId is not null)
+            {
+                <label class="table-toolbar-field">
+                    <span>Appendix</span>
+                    <select name="appendixId" class="input truncate" data-auto-submit aria-label="Select Appendix">
+                        <option value="">Select Appendix</option>
+                        @foreach (var appendix in Model.Appendices)
+                        {
+                            <option value="@appendix.AppendixId" selected="@(appendix.AppendixId == Model.SelectedAppendixId ? "selected" : null)">@appendix.Code - @appendix.Name</option>
+                        }
+                    </select>
+                </label>
+            }
+        </form>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="pre-budget-status-bar">
+            <p class="text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="status">@Model.StatusMessage</p>
+        </div>
+    }
+
+    @if (Model.SelectedDemandId is not null && Model.SelectedAppendixId is not null)
+    {
+        <div class="p-5 space-y-3">
+            @if (Model.Remarks.Count == 0)
+            {
+                <p class="text-sm text-slate-500">No remarks yet for this Demand / Appendix.</p>
+            }
+            else
+            {
+                @foreach (var r in Model.Remarks)
+                {
+                    <div class="rounded border border-slate-200 p-3 dark:border-slate-800">
+                        <div class="flex justify-between text-xs text-slate-500">
+                            <span class="font-semibold">@r.CreatedByRoleSnapshot</span>
+                            <span>@r.CreatedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
+                        </div>
+                        <p class="text-sm mt-1">@r.RemarkText</p>
+                    </div>
+                }
+            }
+
+            @if (Model.CanPostRemark)
+            {
+                <form method="post" autocomplete="off" asp-action="AddRemark" class="mt-4 flex flex-col gap-2">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="demandId" value="@Model.SelectedDemandId" />
+                    <input type="hidden" name="appendixId" value="@Model.SelectedAppendixId" />
+                    <textarea name="remarkText" class="input" rows="3" required placeholder="Add a remark..."></textarea>
+                    <div>
+                        <button type="submit" class="btn-primary"><i data-lucide="send"></i> Post Remark</button>
+                    </div>
+                </form>
+            }
+            else
+            {
+                <p class="text-xs text-slate-500 italic mt-4">Only Budget Division and ABO/DS/Director users may add remarks.</p>
+            }
+        </div>
+    }
+    else if (Model.SelectedDemandId is not null)
+    {
+        <section class="pre-budget-placeholder is-compact">
+            <div class="pre-budget-placeholder-icon"><i data-lucide="message-square"></i></div>
+            <div><h3>Select an Appendix</h3><p>Choose an Appendix above to view or add RE Data Remarks.</p></div>
+        </section>
+    }
+    else
+    {
+        <section class="pre-budget-placeholder">
+            <div class="pre-budget-placeholder-icon"><i data-lucide="message-square"></i></div>
+            <div><h3>Select a Demand</h3><p>Choose a Demand and Appendix above to view or add RE Data Remarks.</p></div>
+        </section>
+    }
+</section>

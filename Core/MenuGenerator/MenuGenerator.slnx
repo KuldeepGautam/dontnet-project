@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Domain/MenuGenerator.Domain.csproj" />
+  <Project Path="Application/MenuGenerator.Application.csproj" />
+  <Project Path="Infrastructure/MenuGenerator.Infrastructure.csproj" />
+  <Project Path="WebApi/MenuGenerator.WebApi.csproj" />
+</Solution>

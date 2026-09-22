@@ -1,0 +1,168 @@
+@model UBIS.Web.Areas.PreBudgetMeeting.Models.AppendixXViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Appendix X - Loan to Government Servants";
+    // Client review 2026-08-05: Actuals are for the 3 trailing years FY-4/FY-3/FY-2; BE and RE are
+    // for FY-1; NBE is the BE proposal for the current budget year FY - all computed off the
+    // session's FinancialYear, not hardcoded.
+    var y1 = Model.YearOffset(-4);
+    var y2 = Model.YearOffset(-3);
+    var y3 = Model.YearOffset(-2);
+    var yMinus1 = Model.PriorFinancialYear;
+    var y = Model.FinancialYear;
+    var locked = Model.IsEntryLocked;
+    var rows = Model.Rows;
+}
+
+<section class="p-0 animate-fade-in">
+    <div class="heading text-center heading-bg justify-between items-center border rounded px-4 py-3 text-white">
+        Appendix X - Loan to Government Servants
+    </div>
+    <div class="flex flex-col gap-3 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between dark:border-slate-800">
+        <span class="text-red-600 text-xs text-right ml-auto">Amount in Crores of Rupees</span>
+    </div>
+
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="px-5 pt-4">
+            <p class="text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="status">@Model.StatusMessage</p>
+        </div>
+    }
+
+    @await Html.PartialAsync("_AppendixPermissionAlert", Model)
+
+    <form method="post" autocomplete="off" asp-action="SaveAppendixX" id="appendixXForm" data-demand-id="@Model.DemandId" data-autosave-key="PreBudget-AppendixX-@Model.DemandId">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="demandId" value="@Model.DemandId" />
+        <input type="hidden" name="code" value="X" />
+        <input type="hidden" name="appendixId" value="@Model.AppendixId" />
+        <fieldset disabled="@(Model.HasEntryPermission && !locked ? null : "disabled")">
+        <div class="overflow-x-auto p-5">
+            <table class="demo-table min-w-full text-sm">
+                <thead>
+                    <tr>
+                        <th>Actuals @y1</th><th>Actuals @y2</th><th>Actuals @y3</th>
+                        <th>Actuals Upto Sept. @(yMinus1.Split('-')[0])</th>
+                        <th>Major Heads, sub-heads etc.</th>
+                        <th colspan="2">@yMinus1</th>
+                        <th>@y</th>
+                    </tr>
+                    <tr>
+                        <th></th><th></th><th></th><th></th><th></th>
+                        <th>BE</th><th>RE</th><th>BE</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < rows.Count; i++)
+                    {
+                        <tr data-sub-head="@rows[i].SubHeadName">
+                            <td>
+                                <input type="hidden" name="rows[@i].Id" value="@rows[i].Id" />
+                                <input type="hidden" name="rows[@i].SubHeadName" value="@rows[i].SubHeadName" />
+                                <input class="input row-inline-inputsm NumericData" type="number" step="0.01" min="0" name="rows[@i].ActualsY1" value="@rows[i].ActualsY1" />
+                            </td>
+                            <td><input class="input row-inline-inputsm NumericData" type="number" step="0.01" min="0" name="rows[@i].ActualsY2" value="@rows[i].ActualsY2" /></td>
+                            <td><input class="input row-inline-inputsm NumericData" type="number" step="0.01" min="0" name="rows[@i].ActualsY3" value="@rows[i].ActualsY3" /></td>
+                            <td><input class="input row-inline-inputsm NumericData" type="number" step="0.01" min="0" name="rows[@i].ActualsUptoSept" value="@rows[i].ActualsUptoSept" /></td>
+                            <td class="whitespace-nowrap">@rows[i].SubHeadName</td>
+                            <td><input class="input row-inline-inputsm NumericData" type="number" step="0.01" min="0" name="rows[@i].BE" value="@rows[i].BE" /></td>
+                            <td><input class="input row-inline-inputsm NumericData" type="number" step="0.01" min="0" name="rows[@i].RE" value="@rows[i].RE" /></td>
+                            <td><input class="input row-inline-inputsm NumericData" type="number" step="0.01" min="0" name="rows[@i].NBE" value="@rows[i].NBE" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="text-xs text-slate-500 px-5 pb-2">Each sub-head can only be saved once per Demand. A row already showing saved values updates that record on Submit; a blank row adds a new one.</p>
+        </fieldset>
+        <div class="mt-4 mb-5 flex flex-wrap justify-center gap-3">
+            <fieldset disabled="@(Model.HasEntryPermission && !locked ? null : "disabled")" style="display:contents;">
+                <button type="submit" class="btn-primary">Submit</button>
+            </fieldset>
+            @if (!Model.IsAppendixFrozen)
+            {
+                <button type="submit" formnovalidate formaction="@Url.Action("FreezeAppendixTemplate")" class="btn-warning">Freeze Data</button>
+            }
+            @if (Model.Records.Count == 0 && !Model.IsAppendixFrozen && !Model.IsNilSubmitted)
+            {
+                <button type="submit" formnovalidate formaction="@Url.Action("SetNilSubmission")" class="btn-secondary" data-confirm="Mark this Appendix as Nil for this Demand and Financial Year? All fields will be disabled." data-confirm-label="Mark as Nil"><i data-lucide="ban"></i> Nil Data</button>
+            }
+            <fieldset disabled="@(Model.HasEntryPermission && !locked ? null : "disabled")" style="display:contents;">
+                <button type="reset" class="btn-secondary">Reset</button>
+            </fieldset>
+        </div>
+    </form>
+
+    <div class="overflow-x-auto p-5">
+        <table class="demo-table min-w-full text-sm">
+            <thead>
+                <tr>
+                    <th>Demand No.</th>
+                    <th>Sub-Head Name</th><th>Actuals @y1</th><th>Actuals @y2</th><th>Actuals @y3</th>
+                    <th>Actuals upto Sept. @(yMinus1.Split('-')[0])</th><th>BE @yMinus1</th><th>RE @yMinus1</th><th>BE @y</th>
+                    @if (!locked)
+                    {
+                        <th>Actions</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Records.Count == 0)
+                {
+                    <tr><td colspan="9" class="empty-state-cell">No records to display.</td></tr>
+                }
+                else
+                {
+                    for (var ri = 0; ri < Model.Records.Count; ri++)
+                    {
+                        var r = Model.Records[ri];
+                        <tr class="@(r.IsFrozen ? "opacity-70" : "")">
+                            <td>@Model.DemandNo</td>
+                            <td>@r.SubHeadName</td>
+                            <td class="NumericData">@r.ActualsY1</td>
+                            <td class="NumericData">@r.ActualsY2</td>
+                            <td class="NumericData">@r.ActualsY3</td>
+                            <td class="NumericData">@r.ActualsUptoSept</td>
+                            <td class="NumericData">@r.BE</td>
+                            <td class="NumericData">@r.RE</td>
+                            <td class="NumericData">@r.NBE</td>
+                            @if (!locked)
+                            {
+                                <td>
+                                @if (!r.IsFrozen)
+                                {
+                                    <div class="flex gap-2">
+                                        <button type="button" class="table-icon-btn table-action-neutral" title="Edit"
+                                                data-action="edit-appendix-x-row"
+                                                data-sub-head="@r.SubHeadName"
+                                                data-id="@r.Id"
+                                                data-actuals-y1="@r.ActualsY1"
+                                                data-actuals-y2="@r.ActualsY2"
+                                                data-actuals-y3="@r.ActualsY3"
+                                                data-actuals-upto-sept="@r.ActualsUptoSept"
+                                                data-be="@r.BE"
+                                                data-re="@r.RE"
+                                                data-nbe="@r.NBE">
+                                            <i data-lucide="pencil"></i>
+                                        </button>
+                                        <form method="post" asp-action="DeleteAppendixX" data-confirm="Delete this record? This cannot be undone.">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@r.Id" />
+                                            <input type="hidden" name="demandId" value="@Model.DemandId" />
+                                            <button type="submit" class="table-icon-btn table-action-danger" title="Delete"><i data-lucide="trash-2"></i></button>
+                                        </form>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="text-xs font-semibold text-slate-500">Frozen</span>
+                                }
+                                </td>
+                            }
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</section>

@@ -1,0 +1,36 @@
+/* Action Buttons */
+.table-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff;
+    color: #475569;
+    transition: all .2s ease;
+}
+
+.table-action:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+}
+
+.table-action.view:hover {
+    color: #2563eb;
+    border-color: #2563eb;
+    background: #eff6ff;
+}
+
+.table-action.edit:hover {
+    color: #d97706;
+    border-color: #d97706;
+    background: #fffbeb;
+}
+
+.table-action.delete:hover {
+    color: #dc2626;
+    border-color: #dc2626;
+    background: #fef2f2;
+}

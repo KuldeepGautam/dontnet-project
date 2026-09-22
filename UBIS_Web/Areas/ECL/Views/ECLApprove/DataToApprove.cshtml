@@ -1,0 +1,147 @@
+@model UBIS.Web.Areas.ECL.Models.EclApprovalGridViewModel
+@{
+    ViewData["Title"] = ViewData["Title"] ?? "Data To Approve";
+}
+
+<section class="panel overflow-hidden p-0 animate-fade-in">
+    <div class="heading text-center heading-bg justify-between items-center border-b rounded-t px-4 py-3 text-white font-bold">
+        @Model.Title
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        @* role="status" is what ecl.js's initSaveStatusDialog() keys on to pop a "Record
+           Saved"/"Could not save" dialog - only add it when this message is actually the result of
+           an Approve/Reject/etc. save action. A plain page load's own status (e.g. "Could not load
+           rows." when GetOutlaysAsync fails) must NOT trigger that dialog - it never attempted to
+           save anything (bug report 2026-08-27: "why is it saving records on page loading" was this
+           exact conflation). *@
+        <div class="px-5 pt-4">
+            <p class="text-sm font-semibold @(Model.StatusIsError ? "text-red-600" : "text-teal")" role="@(Model.IsSaveResult ? "status" : null)">@Model.StatusMessage</p>
+        </div>
+    }
+
+    <div class="flex flex-col gap-5 p-5">
+        <form method="get" asp-action="DataToApprove" class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2" data-auto-submit-filters>
+            <label class="table-toolbar-field">
+                <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Demand Name</span>
+                @* "All" removed from this list (client request 2026-08-27) - an unfiltered query
+                   returns every outlay row across every demand the caller can see (860KB+ of JSON
+                   for a broadly-permissioned role), which was the root cause of an earlier "Could
+                   not load rows." timeout. The controller defaults SelectedDemandId to the first
+                   entry here whenever none is on the query string, so this select's initial
+                   "selected" option always matches what's actually loaded. *@
+                <select name="demandId" class="input truncate">
+                    @foreach (var d in Model.Demands)
+                    {
+                        <option value="@d.DemandId" selected="@(d.DemandId == Model.SelectedDemandId)">@d.DemandNo-@d.DemandName</option>
+                    }
+                </select>
+            </label>
+            @* Financial Year is fixed to the logged-in user's current financial year (client
+               requirement, 2026-08-27) - no longer user-selectable here, so this is a label, not a
+               dropdown. The GET action still falls back to session.FinancialYear whenever this
+               query param isn't present, so nothing else needs to change server-side. *@
+            <div class="table-toolbar-field">
+                <span class="font-bold text-xs uppercase tracking-wider text-slate-600">Financial Year</span>
+                <div class="input flex items-center bg-slate-100 dark:bg-slate-800">@Model.FinancialYear</div>
+            </div>
+        </form>
+
+        <div class="text-right text-red-600 font-medium text-xs md:text-sm italic">Amount in Crores of Rupees</div>
+
+        <form method="post" id="approvalGridForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="demandId" value="@Model.SelectedDemandId" />
+            <input type="hidden" name="financialYear" value="@Model.FinancialYear" />
+
+            <div class="overflow-x-auto rounded-lg border border-slate-200 shadow-sm">
+                <table id="dataToApproveTable" class="w-full border-collapse text-center text-xs">
+                    <thead class="bg-slate-100 font-bold uppercase tracking-wider text-slate-700">
+                        <tr>
+                            <th class="border-b border-r border-slate-200 p-2.5" style="width:340px;">Scheme</th>
+                            <th class="border-b border-r border-slate-200 p-2.5">Total Outlay</th>
+                            <th class="border-b border-r border-slate-200 p-2.5">Central Share</th>
+                            @foreach (var y in Model.OutlayYearColumns)
+                            {
+                                <th class="border-b border-r border-slate-200 p-2.5 outlay-year-col">@y</th>
+                            }
+                            <th class="border-b border-r border-slate-200 p-2.5">File</th>
+                            <th class="border-b border-r border-slate-200 p-2.5">User Remarks</th>
+                            <th class="border-b border-r border-slate-200 p-2.5" style="min-width:220px;">DOE Remarks</th>
+                            <th class="border-b border-slate-200 p-2.5">Select</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 text-slate-700">
+                        @if (Model.Rows.Count == 0)
+                        {
+                            <tr><td colspan="@(7 + Model.OutlayYearColumns.Count)" class="empty-state-cell">No rows pending approval.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var row in Model.Rows)
+                            {
+                                var isApproved = string.Equals(row.ApprovedByDoe, "Y", StringComparison.OrdinalIgnoreCase);
+                                // Client requirement 2026-08-27: User Remarks truncated to its first 20
+                                // characters with a trailing "…" so a long remark doesn't blow out row
+                                // height/grid width - the full text is still available via the title
+                                // attribute (native browser tooltip on hover), never lost.
+                                var userRemarks = row.UserRemarks ?? string.Empty;
+                                var userRemarksTruncated = userRemarks.Length > 20 ? userRemarks.Substring(0, 20) + "…" : userRemarks;
+                                <tr class="@(isApproved ? "bg-green-100" : "hover:bg-slate-50") transition-colors" data-row-id="@row.RowId">
+                                    <td class="border-r border-slate-200 p-2 text-left font-semibold text-slate-800" style="width:340px;">@(!string.IsNullOrEmpty(row.SchemeName) ? $"{row.SchemeSrNo ?? 0} - {row.SchemeName}" : $"Scheme #{row.SchemeId}")</td>
+                                    <td class="border-r border-slate-200 p-2 text-right font-medium">@row.TotalOutlay?.ToString("N2")</td>
+                                    <td class="border-r border-slate-200 p-2 text-right font-medium">@row.CentralShare?.ToString("N2")</td>
+                                    @foreach (var v in row.Outlay)
+                                    {
+                                        <td class="border-r border-slate-200 p-2 text-right outlay-year-col">@(v?.ToString("N2") ?? "0.00")</td>
+                                    }
+                                    <td class="border-r border-slate-200 p-2">
+                                        @if (!string.IsNullOrEmpty(row.FileName))
+                                        {
+                                            <a class="text-teal inline-flex items-center justify-center" href="~/uploads/ecl/@row.FileName" target="_blank" rel="noopener" title="Open PDF">
+                                                <i data-lucide="file-text"></i>
+                                            </a>
+                                        }
+                                    </td>
+                                    <td class="border-r border-slate-200 p-2 text-left" title="@userRemarks">@userRemarksTruncated</td>
+                                    <td class="border-r border-slate-200 p-2 text-left" style="min-width:220px;">
+                                        @if (isApproved)
+                                        {
+                                            @* Action column removed (client request 2026-08-27) - per-row Approve/Reject
+                                               is now Select + Approve Selected/Reject Selected only, below the grid. An
+                                               already-approved row has nothing left to action, so its DOE Remarks show as
+                                               a plain read-only label (not an editable/disabled textarea) alongside an
+                                               "Approved by DOE" badge - the badge that used to live in the Action column. *@
+                                            <span class="mb-1 inline-block rounded bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">Approved by DOE</span>
+                                            <p class="text-xs text-slate-700">@row.DoeRemarks</p>
+                                        }
+                                        else
+                                        {
+                                            <textarea name="remarks[@row.RowId]" class="input text-xs" rows="3" placeholder="Remarks">@row.DoeRemarks</textarea>
+                                        }
+                                    </td>
+                                    <td class="p-2">
+                                        <input type="checkbox" name="rowIds" value="@row.RowId" class="row-select-checkbox" disabled="@isApproved" />
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (Model.Rows.Any(r => !string.Equals(r.ApprovedByDoe, "Y", StringComparison.OrdinalIgnoreCase)))
+            {
+                <div class="flex gap-3 justify-center mt-4">
+                    <button type="submit" formaction="@Url.Action("ApproveSelected")" id="approveSelectedBtn" class="btn-primary text-sm py-2 px-4">Approve Selected</button>
+                    <button type="submit" formaction="@Url.Action("RejectSelected")" id="rejectSelectedBtn" class="btn-secondary text-sm py-2 px-4 border border-red-700 text-white bg-red-600 hover:bg-red-700">Reject Selected</button>
+                </div>
+            }
+        </form>
+    </div>
+</section>
+
+@section Scripts {
+    <script src="~/js/ecl.js" asp-append-version="true"></script>
+}

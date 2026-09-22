@@ -1,0 +1,2251 @@
+:root {
+  color-scheme: light;
+  --ubis-navy: #063f66;
+  --ubis-navy-deep: #052f4c;
+  --ubis-teal: #06aeb8;
+  --ubis-teal-soft: #e7fbfc;
+  --ubis-amber: #f59e0b;
+  --ubis-ink: #0f172a;
+  --ubis-copy: #475569;
+  --ubis-muted: #64748b;
+  --ubis-border: rgba(148, 163, 184, 0.24);
+  --ubis-border-strong: rgba(148, 163, 184, 0.36);
+  --ubis-panel: rgba(255, 255, 255, 0.94);
+  --ubis-bg: #f4f8fc;
+  --ubis-shadow-sm: 0 10px 24px rgba(6, 63, 102, 0.06);
+  --ubis-shadow-md: 0 18px 44px rgba(6, 63, 102, 0.08);
+  --ubis-shadow-lg: 0 28px 70px rgba(15, 23, 42, 0.12);
+  --ubis-radius-lg: 1rem;
+  --ubis-radius-xl: 1.25rem;
+  --ubis-radius-2xl: 1.5rem;
+  --ubis-transition: 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+
+body {
+  line-height: 1.6;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  font-family: 'Lato', sans-serif;;
+  /* background-image: url("../images/UBIS-Logo-LoginN.png"); */
+}
+.finance-hero {
+  background-image:  linear-gradient(to bottom, #e6f4fb 5%, #e4eaec 100%);
+  /* color: #ffffff; */
+}
+
+.bg-gradient{
+  background: linear-gradient(
+        180deg,
+        #041f2d 0%,
+        #034c64 45%,
+        #056084 100%
+    );
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a,
+summary {
+  transition: color var(--ubis-transition), background-color var(--ubis-transition), border-color var(--ubis-transition), box-shadow var(--ubis-transition), transform var(--ubis-transition), opacity var(--ubis-transition);
+}
+
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(6, 174, 184, 0.16);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgba(6, 174, 184, 0.18);
+  color: var(--ubis-navy-deep);
+}
+
+/* Dark mode (client report, 2026-08-24: "colors not properly visible, selected text not visible"):
+   color-scheme was hardcoded to "light" at :root and never revisited for .dark, so every
+   browser-native control - <select> dropdown popups, checkboxes/radios, date/time pickers,
+   scrollbars, spell-check underlines - kept rendering with light-mode chrome even once the app's
+   own .dark theme was active. Worst case: a <select class="input"> gets its light text color
+   (#e2e8f0) from .dark .input's closed-box styling, but its native OPEN dropdown popup stayed
+   white-background because the browser had no signal to switch - light text on a white popup is
+   exactly "not visible". Flipping color-scheme to dark for .dark fixes all of the above at once,
+   for free, without hand-styling every native control. ::selection needs its own explicit override
+   too - the light-mode rule's dark navy text (--ubis-navy-deep) landed on an already-dark page
+   background, which is the literal "selected text not visible" report. */
+.dark {
+  color-scheme: dark;
+  /* Same report: --ubis-ink/--ubis-copy/--ubis-muted are the default text colors for dozens of
+     elements across this file (labels, table cells, helper text, etc.) that never got their own
+     .dark override - they kept using colors tuned for a light background (near-black/slate-600/
+     slate-500), which read as low-contrast-to-invisible against the dark theme's dark backgrounds.
+     Redefining them here fixes every one of those gaps at once; anything that already has its own
+     more specific .dark rule (e.g. .dark .input) is unaffected, since a literal color there simply
+     doesn't reference these variables. */
+  --ubis-ink: #f1f5f9;
+  --ubis-copy: #cbd5e1;
+  --ubis-muted: #94a3b8;
+}
+
+.dark ::selection {
+  background: rgba(6, 174, 184, 0.45);
+  color: #000;
+}
+.w100{width:100%;}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  35% {
+    transform: translateX(-4px);
+  }
+  70% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes ubis-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Shared processing overlay (2026-08-10) - dims/fades the whole screen behind a rotating spinner
+   while an async operation is in flight, so the user knows something is happening instead of
+   seeing what looks like a frozen page. Used on Login (login.js's setLoading, already wired to
+   #loginStatus/#loginStatusMessage) and Dashboard (dashboard-bootstrap.js). Lives in styles.css,
+   not login.css, since both pages load this file but only Login loads login.css. */
+.ubis-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: rgba(15, 23, 42, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.ubis-loading-overlay.is-visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.ubis-loading-spinner {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 4px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #06aeb8;
+  animation: ubis-spin 0.8s linear infinite;
+}
+
+.ubis-loading-text {
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.bg-grid {
+  /* background-image:
+    radial-gradient(circle at 1px 1px, rgba(6, 174, 184, 0.08) 1px, transparent 0),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(244, 248, 252, 0.96)); */
+  background-size: 28px 28px, auto;
+  background-color: var(--ubis-bg);
+}
+
+.emblem {
+  display: flex;
+  height: 110px;
+  max-width: 110px;
+  align-items: center;
+  justify-content: center;
+  /* border-radius: 999px; */
+  /* border: 1px solid rgba(15, 23, 42, 0.14); */
+  /* background: rgba(255, 255, 255, 0.94); */
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: var(--ubis-navy);
+  /* box-shadow: var(--ubis-shadow-sm); */
+}
+
+
+.emblem.small {
+  height: 46px;
+  width: 46px;
+  font-size: 0.78rem;
+}
+
+.input {
+  width: 100%;
+  border-radius: 0.3rem;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  background: rgba(248, 250, 252, 0.86);
+  min-height: 2.25rem;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.9rem;
+  line-height: 1.3;
+  font-weight: 400;
+  color: var(--ubis-ink);
+  outline: none;
+  transition: border-color var(--ubis-transition), box-shadow var(--ubis-transition), background-color var(--ubis-transition), transform var(--ubis-transition);
+}
+
+.input::placeholder {
+  color: #94a3b8;
+}
+
+.input:focus {
+  border-color: rgba(6, 174, 184, 0.58);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(6, 174, 184, 0.12);
+  transform: translateY(-1px);
+}
+
+/* Client requirement 2026-08-27 ("highlight in light red the textboxes that require value to
+   enter, once value is entered light red color should go", applied module-wide) - revised
+   2026-08-27: fields must stay default-colored until a Save/Submit/Modify attempt, only then
+   should the still-empty required fields turn light red (native :required:invalid fired on every
+   page load instead, before the user had done anything). .field-missing is toggled by
+   site.js's initRequiredFieldHighlight() on submit, and removed the instant a field becomes valid
+   - see that function for the single global entry point covering every module. */
+.input.field-missing:not(:disabled) {
+  background: rgba(254, 226, 226, 0.9);
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+.dark .input.field-missing:not(:disabled) {
+  background: rgba(127, 29, 29, 0.35);
+  border-color: rgba(248, 113, 113, 0.55);
+}
+
+.dark .input {
+  border-color: rgba(71, 85, 105, 0.74);
+  background: rgba(15, 23, 42, 0.9);
+  color: #e2e8f0;
+}
+
+.float-field {
+  position: relative;
+  display: block;
+}
+
+.float-field input {
+  width: 100%;
+  min-height: 3.25rem;
+  border-radius: 0.3rem;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  background: rgba(248, 250, 252, 0.86);
+  padding: 1.35rem 0.9rem 0.5rem;
+  font-size: 0.92rem;
+  line-height: 1.25;
+  font-weight: 300;
+  color: var(--ubis-ink);
+  outline: none;
+  transition: border-color var(--ubis-transition), box-shadow var(--ubis-transition), background-color var(--ubis-transition), transform var(--ubis-transition);
+}
+
+.float-field input:focus {
+  border-color: rgba(6, 174, 184, 0.58);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(6, 174, 184, 0.12);
+  transform: translateY(-1px);
+}
+
+.float-field span {
+  pointer-events: none;
+  position: absolute;
+  left: 0.9rem;
+  top: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ubis-muted);
+}
+
+.dark .float-field input {
+  border-color: rgba(71, 85, 105, 0.74);
+  background: rgba(15, 23, 42, 0.9);
+  color: #e2e8f0;
+}
+
+.support-card {
+  display: block;
+  border: 1px solid var(--ubis-border);
+  border-radius: var(--ubis-radius-xl);
+  background: var(--ubis-panel);
+  padding: 1.35rem;
+  box-shadow: var(--ubis-shadow-sm);
+}
+
+.support-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ubis-shadow-md);
+}
+
+.support-card span {
+  display: inline-flex;
+  border-radius: 999px;
+  background: var(--ubis-teal-soft);
+  padding: 0.35rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ubis-navy);
+}
+
+.support-card strong {
+  display: block;
+  margin-top: 1rem;
+  font-size: 1.05rem;
+  color: var(--ubis-ink);
+}
+
+.support-card small {
+  display: block;
+  margin-top: 0.45rem;
+  line-height: 1.6;
+  color: var(--ubis-muted);
+}
+
+
+.group sidebar-accordion svg {
+    display: none;
+}
+
+.sidebar-accordion .group svg {
+    display: none !important;
+}
+
+
+.nav-link,
+.nav-section {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 0.9rem;
+  padding: 0.82rem 0.95rem;
+  text-align: left;
+  font-size: 0.94rem;
+  font-weight: 400;
+  color: var(--ubis-copy);
+  /* .nav-section is a <summary> toggle — unlike <a>/<button>, browsers don't apply a pointer
+     cursor to it by default, and Tailwind's reset only covers button/[role=button]. */
+  cursor: pointer;
+}
+
+.dark .nav-link,
+.dark .nav-section {
+  color: #cbd5e1;
+}
+
+.nav-link svg,
+.nav-section svg {
+  height: 1.05rem;
+  width: 1.05rem;
+  color: #0f7c84;
+}
+
+.nav-link:hover,
+.nav-section:hover {
+  background: rgba(6, 174, 184, 0.08);
+  color: var(--ubis-navy);
+  transform: translateX(2px);
+}
+
+.dark .nav-link:hover,
+.dark .nav-section:hover {
+  background: rgba(6, 174, 184, 0.16);
+}
+
+.nav-link.active,
+.nav-section.is-current,
+.sidebar-accordion[open] > .nav-section {
+  background: linear-gradient(135deg, rgba(6, 174, 184, 0.14), rgba(6, 63, 102, 0.08));
+  color: var(--ubis-navy);
+  box-shadow: inset 0 0 0 1px rgba(6, 174, 184, 0.16);
+   font-weight: 700;
+}
+
+/* Client report 2026-08-27: in dark mode, the top-level sidebar item stays barely visible once
+   its child is selected (open accordion / .is-current) - color: var(--ubis-navy) is a dark navy
+   (#063f66) that was never overridden for dark mode, so it reads as near-black text against the
+   already-dark sidebar background. Light gray instead, only for this highlighted state. */
+.dark .nav-link.active,
+.dark .nav-section.is-current,
+.dark .sidebar-accordion[open] > .nav-section {
+  color: #d1d5db;
+}
+
+.sub-link {
+  display: block;
+  border-radius: 0.4rem;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ubis-muted);
+  margin:0.3rem 0 0 0;
+  cursor: pointer;
+}
+
+.sub-link:hover {
+  background: rgba(6, 174, 184, 0.08);
+  color: var(--ubis-navy);
+}
+
+.sub-link.active-child {
+  background: var(--ubis-teal-soft);
+  color: var(--ubis-navy);
+  font-weight: 700;
+}
+
+.sub-link-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.sub-link-toggle::-webkit-details-marker,
+.sidebar-child-accordion > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sidebar-subchildren {
+  margin-top: 0.2rem;
+  padding-left: 0.9rem;
+  overflow: hidden;
+  border-left: 1px solid rgba(148, 163, 184, 0.35);
+  transition: max-height 220ms ease, opacity 180ms ease, transform 180ms ease;
+}
+
+.sidebar-child-accordion:not([open]) .sidebar-subchildren {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.sidebar-child-accordion[open] .sidebar-subchildren {
+  max-height: 100rem;
+  overflow: visible;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.sidebar-sub-toggle-icon {
+  flex-shrink: 0;
+  transition: transform 180ms ease;
+    height: 1rem;
+  width: 1rem;
+}
+
+.sidebar-child-accordion[open] .sidebar-sub-toggle-icon {
+  transform: rotate(90deg);
+}
+
+.sidebar-collapsed #sidebar {
+  width: 5.25rem;
+}
+
+.sidebar-collapsed #appFrame {
+  padding-left: 5.25rem;
+}
+
+.sidebar-collapsed .sidebar-label {
+  display: none;
+}
+
+.sidebar-collapsed .nav-link,
+.sidebar-collapsed .nav-section {
+  justify-content: center;
+}
+
+.sidebar-collapsed .sidebar-children {
+  display: none;
+}
+
+.sidebar-collapsed .nav-section {
+  position: relative;
+}
+
+.sidebar-accordion > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sidebar-accordion .sidebar-label.ml-8 {
+  overflow: hidden;
+  transition: max-height 220ms ease, opacity 180ms ease;
+}
+
+.sidebar-accordion:not([open]) .sidebar-label.ml-8 {
+  max-height: 0;
+  opacity: 0;
+}
+
+.sidebar-accordion[open] .sidebar-label.ml-8 {
+  max-height: 120rem;
+  overflow: visible;
+  opacity: 1;
+}
+
+.sidebar-floating-menu {
+  position: fixed;
+  z-index: 70;
+  width: min(24rem, calc(100vw - 1.5rem));
+  border: 1px solid var(--ubis-border);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(8px, 0, 0) scale(0.98);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.sidebar-floating-menu::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: -28px;
+  width: 34px;
+  height: calc(100% + 20px);
+}
+
+.sidebar-floating-menu.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.dark .sidebar-floating-menu {
+  border-color: rgba(71, 85, 105, 0.58);
+  background: rgba(15, 23, 42, 0.98);
+  box-shadow: 0 24px 60px rgba(2, 6, 23, 0.55);
+}
+
+.sidebar-floating-menu__title {
+  padding: 1rem 1rem 0.8rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--ubis-navy);
+}
+
+.dark .sidebar-floating-menu__title {
+  border-color: rgba(71, 85, 105, 0.55);
+  color: #f8fafc;
+}
+
+.sidebar-floating-menu__scroll {
+  overflow: visible;
+  padding: 0.8rem;
+}
+
+.sidebar-floating-group + .sidebar-floating-group {
+  margin-top: 0.45rem;
+}
+
+.sidebar-floating-link {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-radius: 0.8rem;
+  padding: 0.72rem 0.85rem;
+  font-weight: 800;
+  color: var(--ubis-copy);
+}
+
+.sidebar-floating-link.is-active {
+  background: linear-gradient(135deg, rgba(6, 174, 184, 0.14), rgba(6, 63, 102, 0.08));
+  color: var(--ubis-navy);
+  box-shadow: inset 0 0 0 1px rgba(6, 174, 184, 0.16);
+}
+
+.sidebar-floating-submenu {
+  margin-top: 0.25rem;
+}
+
+.sidebar-floating-sublink {
+  display: flex;
+  width: calc(100% - 0.7rem);
+  margin-top: 0.28rem;
+  margin-left: 0.7rem;
+  border-radius: 0.8rem;
+  padding: 0.72rem 0.85rem;
+  font-size: 0.84rem;
+  color: var(--ubis-muted);
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.sidebar-floating-sublink:hover,
+.sidebar-floating-sublink:focus-visible {
+  background: rgba(6, 174, 184, 0.08);
+  color: var(--ubis-navy);
+  outline: none;
+}
+
+.sidebar-floating-sublink.is-active {
+  background: linear-gradient(135deg, rgba(6, 174, 184, 0.14), rgba(6, 63, 102, 0.08));
+  color: var(--ubis-navy);
+  box-shadow: inset 0 0 0 1px rgba(6, 174, 184, 0.16);
+}
+
+.dark .sidebar-floating-link {
+  color: #cbd5e1;
+}
+
+.dark .sidebar-floating-sublink {
+  color: #94a3b8;
+}
+
+.dark .sidebar-floating-sublink:hover,
+.dark .sidebar-floating-sublink:focus-visible {
+  background: rgba(6, 174, 184, 0.16);
+  color: #f8fafc;
+}
+
+.top-tab {
+  padding: 0.95rem 1.15rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0.92;
+}
+
+.top-tab:hover {
+  background: rgba(5, 47, 76, 0.42);
+  opacity: 1;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--ubis-border);
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.65rem 0.95rem;
+  color: var(--ubis-copy);
+  box-shadow: var(--ubis-shadow-sm);
+}
+
+.icon-btn:hover {
+  background: #fff;
+  color: var(--ubis-navy);
+  transform: translateY(-1px);
+}
+
+.dark .icon-btn {
+  border-color: rgba(71, 85, 105, 0.64);
+  background: rgba(15, 23, 42, 0.9);
+  color: #cbd5e1;
+}
+
+.header-alert-btn {
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.header-alert-label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.header-alert-count {
+  display: inline-flex;
+  min-width: 1.55rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  padding: 0.12rem 0.42rem;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.global-search {
+  display: block;
+}
+
+.global-search svg {
+  opacity: 0.7;
+}
+
+.menu-pop {
+  display: block;
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.8rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.menu-pop:hover {
+  background: rgba(6, 174, 184, 0.08);
+  color: var(--ubis-navy);
+}
+
+.panel {
+  /* border: 1px solid var(--ubis-border); */
+  border-radius: var(--ubis-radius-xl);
+  background: var(--ubis-panel);
+  padding: 0.5rem 1.4rem 0.5rem 1.4rem  ;
+  box-shadow: var(--ubis-shadow-md);
+}
+
+.dark .panel {
+  border-color: rgba(71, 85, 105, 0.48);
+  background: rgba(15, 23, 42, 0.92);
+}
+
+.panel-title {
+  font-size: 1rem;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ubis-navy);
+}
+
+.dark .panel-title {
+  color: #fff;
+}
+
+.stat-card {
+  border: 1px solid var(--ubis-border);
+  border-radius: var(--ubis-radius-xl);
+  background: var(--ubis-panel);
+  padding: 1.25rem;
+  box-shadow: var(--ubis-shadow-sm);
+}
+
+.dark .stat-card {
+  border-color: rgba(71, 85, 105, 0.48);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ubis-shadow-md);
+}
+
+.stat-card svg {
+  height: 1.35rem;
+  width: 1.35rem;
+  color: var(--ubis-teal);
+}
+
+.stat-card span {
+  margin-top: 0.85rem;
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--ubis-muted);
+}
+
+.stat-card strong {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 1.7rem;
+  line-height: 1.2;
+  color: var(--ubis-navy);
+}
+
+.dark .stat-card strong {
+  color: #fff;
+}
+
+.stat-card small {
+  display: block;
+  margin-top: 0.4rem;
+  color: #0f766e;
+}
+
+.btn-primary,
+.btn-secondary, .btn-warning,
+.table-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-radius: 0.85rem;
+  padding: 0.50rem 1rem;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.btn-primary {
+  border: 1px solid transparent;
+  background: var(--ubis-navy);
+  color: #fff;
+  box-shadow: var(--ubis-shadow-sm);
+}
+
+.btn-primary:hover {
+  background: var(--ubis-navy-deep);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ubis-copy);
+  
+}
+
+.btn-secondary:hover {
+  border-color: rgba(6, 174, 184, 0.2);
+  background: rgba(6, 174, 184, 0.08);
+  color: var(--ubis-navy);
+  transform: translateY(-1px);
+}
+
+/* Client report 2026-08-27: in dark mode ("Reset"/"Nil Data" on the Appendix screens),
+   .btn-secondary's background stays near-white (rgba(255,255,255,0.88), never overridden for
+   dark mode) while its text color switches to --ubis-copy's dark-mode value (a light slate) -
+   light text on a white background, unreadable. Background is unchanged (still white); text
+   forced black to match it. */
+.dark .btn-secondary {
+  color: #000;
+}
+
+.btn-warning {
+  border: 1px solid rgba(223, 150, 16, 0.2);
+  background: #ffc107;
+  color: var(--ubis-navy);
+}
+
+.btn-warning:hover {
+  border-color: rgba(223, 150, 16, 0.2);
+  background: #f0b504;
+  color: var(--ubis-navy);
+  transform: translateY(-1px);
+}
+
+.btn-danger {
+  background: #dc2626;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+}
+
+.quick {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 1rem;
+  border: 1px solid var(--ubis-border);
+  background: rgba(248, 250, 252, 0.84);
+  padding: 0.95rem 1rem;
+  text-align: left;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.quick:hover {
+  transform: translateY(-2px);
+  background: rgba(6, 174, 184, 0.08);
+  color: var(--ubis-navy);
+}
+
+.notice {
+  margin-top: 0.8rem;
+  border-radius: 1rem;
+  padding: 0.9rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.notice.amber {
+  background: rgb(255 251 235);
+  color: rgb(120 53 15);
+}
+
+.notice.blue {
+  background: rgb(239 246 255);
+  color: rgb(30 64 175);
+}
+
+.notice.green {
+  background: rgb(236 253 245);
+  color: rgb(4 120 87);
+}
+
+.activity,
+.timeline-item {
+  margin-top: 0.85rem;
+  border-left: 3px solid rgba(6, 174, 184, 0.7);
+  padding-left: 0.85rem;
+  color: var(--ubis-copy);
+}
+
+.dark .activity,
+.dark .timeline-item {
+  color: #cbd5e1;
+}
+
+.chart-bars {
+  display: flex;
+  height: 18rem;
+  align-items: end;
+  gap: 0.85rem;
+  border-left: 1px solid rgba(226, 232, 240, 0.9);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  padding: 0 0.3rem;
+}
+
+.chart-bars div {
+  flex: 1;
+  min-height: 2rem;
+  border-radius: 0.7rem 0.7rem 0 0;
+  background: linear-gradient(180deg, #06aeb8, #063f66);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition: height 220ms ease, filter var(--ubis-transition), transform var(--ubis-transition);
+}
+
+.chart-bars div:hover {
+  filter: brightness(1.05);
+  transform: translateY(-2px);
+}
+
+.form-grid {
+  display: grid;
+  gap: 0.95rem 1rem;
+  align-items: start;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+@media (min-width: 768px) {
+  .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.field {
+  display: grid;
+  gap: 0.32rem;
+  align-content: start;
+  animation: slideUp 340ms ease both;
+}
+
+.field span {
+  order: 1;
+}
+
+.field input,
+.field select,
+.field textarea {
+  order: 2;
+  width: 100%;
+  min-height: 2.65rem;
+  border-radius: 0.3rem;
+  border: 1px solid rgba(203, 213, 225, 0.92);
+  background: rgba(248, 250, 252, 0.86);
+  padding: 0.62rem 0.8rem;
+  font-size: 0.9rem;
+  line-height: 1.3;
+  font-weight: 600;
+  color: var(--ubis-ink);
+  outline: none;
+  transition: border-color var(--ubis-transition), box-shadow var(--ubis-transition), background-color var(--ubis-transition), transform var(--ubis-transition);
+}
+
+.field textarea {
+  min-height: 5.6rem;
+  padding-top: 0.76rem;
+  resize: vertical;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: rgba(6, 174, 184, 0.58);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(6, 174, 184, 0.12);
+  transform: translateY(-1px);
+}
+
+.field span {
+  position: static;
+  margin-bottom: 0.08rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+   /*color: var(--ubis-muted);*/
+}
+
+.field b {
+  color: #dc2626;
+}
+
+.field p {
+  order: 3;
+  display: none;
+  margin-top: 0.18rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #dc2626;
+}
+
+.dark .field input,
+.dark .field select,
+.dark .field textarea {
+  border-color: rgba(71, 85, 105, 0.74);
+  background: rgba(15, 23, 42, 0.9);
+  color: #e2e8f0;
+}
+
+#togglePassword {
+  top: 50%;
+  right: 0.85rem;
+  transform: translateY(-50%);
+}
+
+.table-search,
+.table-filter {
+  min-height: 2.55rem;
+}
+
+.field.invalid input,
+.field.invalid select,
+.field.invalid textarea {
+  border-color: #dc2626;
+  animation: shake 220ms ease;
+}
+
+.field.invalid p {
+  display: block;
+}
+
+.demo-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.demo-table thead th {
+  background: linear-gradient(180deg, #0b8190, #086b78);
+  color: white;
+  text-align: center;
+  padding: 0.30rem 0.20rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  /* Client requirement 2026-08-27: "grid header should be First letter Capital case, not all
+     Capital letters" - single-property change, was uppercase (every letter forced upper
+     regardless of how the header text is actually written in markup); capitalize only
+     upper-cases the first letter of each word, leaving the rest as written. Applies to every
+     .demo-table grid across the whole PreBudget module in one place - #savedOutlaysTable's own
+     text-transform: none override further down is untouched (higher-specificity ID selector,
+     already opted out of this class rule entirely). */
+  text-transform: capitalize;
+  cursor: pointer;
+}
+
+.demo-table td {
+  padding: 0.1rem 0.2rem;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  font-size: 0.88rem;
+  color: var(--ubis-copy);
+  vertical-align: middle;
+}
+
+.dark .demo-table td {
+  border-color: rgba(51, 65, 85, 0.9);
+}
+
+.demo-table tbody tr:hover {
+  background: rgba(6, 174, 184, 0.05);
+}
+
+/* "On Edit Click, row should be selected and highlighted (All Appendix)" - client testing feedback,
+   2026-08-24. Applied generically by pre-budget-meeting.js to whichever history-grid row an Edit
+   button was clicked in, cleared from every sibling row first. */
+.demo-table tbody tr.appendix-row-editing {
+  background: rgba(6, 174, 184, 0.14);
+  box-shadow: inset 3px 0 0 #06aeb8;
+}
+.dark .demo-table tbody tr.appendix-row-editing {
+  background: rgba(6, 174, 184, 0.2);
+}
+
+/* Pre-Budget Meeting module (client direction, 2026-08-24): every numeric entry-form textbox
+   across every appendix must be right-aligned, matching standard accounting/spreadsheet
+   convention - most sit in a .demo-table cell, but a few (e.g. Appendix VI-A's Total Revenue
+   row) are laid out in a plain grid instead, so this targets every .input[type=number] in the
+   module rather than just table cells. Scoped to the module's own fragment container so it
+   doesn't affect number inputs elsewhere in the app. */
+#partialViewContainer input.input[type="number"] {
+  text-align: right;
+}
+
+.pager {
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0.55rem 0.85rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.pager.active {
+  background: var(--ubis-navy);
+  color: white;
+  border-color: var(--ubis-navy);
+}
+
+.setting-row {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid var(--ubis-border);
+  border-radius: 1rem;
+  background: rgba(248, 250, 252, 0.78);
+  padding: 0.9rem 1rem;
+}
+
+.faq {
+  border: 1px solid var(--ubis-border);
+  border-radius: 1rem;
+  padding: 1rem 1.1rem;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.faq summary {
+  cursor: pointer;
+  font-weight: 900;
+  color: var(--ubis-navy);
+}
+
+.faq p {
+  margin-top: 0.65rem;
+  color: var(--ubis-muted);
+}
+
+.page-title-band {
+  border-radius: 1.25rem;
+  background: linear-gradient(135deg, rgba(6, 174, 184, 0.15), rgba(6, 63, 102, 0.08)) !important;
+  padding: 1.15rem 1.35rem !important;
+  text-align: left !important;
+  font-size: 1.85rem !important;
+  line-height: 1.2;
+  color: var(--ubis-navy) !important;
+  box-shadow: var(--ubis-shadow-sm);
+}
+
+.dashboard-hero {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 1.5rem;
+  padding: 1.8rem !important;
+  box-shadow: var(--ubis-shadow-lg);
+}
+
+.table-action {
+  min-height: 2rem;
+  padding: 0.45rem 0.72rem;
+  border: 1px solid transparent;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.table-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 0.50rem;
+  border: 1px solid rgba(203, 213, 225, 0.85);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ubis-copy);
+  box-shadow: var(--ubis-shadow-sm);
+  transition: transform var(--ubis-transition), background-color var(--ubis-transition), color var(--ubis-transition), border-color var(--ubis-transition), box-shadow var(--ubis-transition);
+}
+
+.table-icon-btn svg {
+  width: 0.98rem;
+  height: 0.98rem;
+}
+
+.table-icon-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(6, 174, 184, 0.28);
+  background: #fff;
+}
+
+.table-action-icon:hover {
+  color: var(--ubis-navy);
+}
+
+.table-action-save {
+  color: #0f766e;
+  background: #ecfeff;
+  border-color: rgba(13, 148, 136, 0.2);
+}
+
+.table-action-save:hover {
+  color: #115e59;
+  background: #cffafe;
+}
+
+.table-action-reset {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.table-action-reset:hover {
+  color: #1e40af;
+  background: #dbeafe;
+}
+
+.table-action-cancel {
+  color: #7c3aed;
+  background: #f5f3ff;
+  border-color: rgba(124, 58, 237, 0.18);
+}
+
+.table-action-cancel:hover {
+  color: #6d28d9;
+  background: #ede9fe;
+}
+
+.table-action-neutral {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.table-action-accent {
+  background: #cffafe;
+  color: var(--ubis-navy);
+}
+
+.table-action-danger {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+.table-action-danger:hover {
+  color: #991b1b;
+  background: #fecaca;
+}
+
+.table-action:hover {
+  transform: translateY(-1px);
+  filter: brightness(0.98);
+}
+
+.table-shell {
+  display: grid;
+  gap: 0;
+}
+
+.table-shell-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  padding: 1.2rem 1.3rem 1rem;
+}
+.table-shell-copy {
+  margin-top: 0.3rem;
+  font-size: 0.9rem;
+  color: var(--ubis-muted);
+}
+
+.table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+}
+
+.table-toolbar-field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 15rem;
+}
+
+.table-toolbar-field-compact {
+  min-width: 11rem;
+}
+
+.table-toolbar-field span {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ubis-muted);
+}
+
+/* Single Demand User's Demand "dropdown" replacement (client requirement 2026-08-27) - same
+   height/shape as .input so it lines up with the Appendix dropdown beside it, but styled as a
+   highlighted, non-interactive label instead of an editable control. */
+.demand-pill {
+  display: flex;
+  align-items: center;
+  min-height: 2.25rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 0.3rem;
+  background: var(--ubis-teal-soft);
+  box-shadow: inset 0 0 0 1px rgba(6, 174, 184, 0.3);
+  color: var(--ubis-navy);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.dark .demand-pill {
+  background: rgba(6, 174, 184, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(6, 174, 184, 0.35);
+  color: #e2e8f0;
+}
+
+.table-summary {
+  padding: 0.85rem 1.3rem 0;
+}
+
+.sort-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: inherit;
+}
+
+.sort-indicator {
+  min-width: 0.8rem;
+  font-size: 0.8rem;
+}
+
+.action-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.action-cell {
+  justify-content: flex-end;
+  min-width: 10.5rem;
+}
+
+.table-row-editing {
+  background: rgba(6, 174, 184, 0.07);
+}
+
+.table-row-editing td {
+  transition: background-color var(--ubis-transition), border-color var(--ubis-transition);
+}
+
+.row-inline-cell {
+  animation: fadeIn 180ms ease;
+}
+
+.row-inline-input {
+  min-height: 2.45rem;
+  padding: 0.52rem 0.7rem;
+  border-radius: 0.75rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.row-inline-input.inline-error {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.32rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.status-approved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-review {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.5);
+  padding: 1rem;
+}
+
+.confirm-card {
+  width: 100%;
+  max-width: 26rem;
+  border-radius: 1.25rem;
+  background: #fff;
+  padding: 1.5rem;
+  box-shadow: var(--ubis-shadow-lg);
+  animation: scaleIn 180ms ease;
+}
+
+.dark .confirm-card {
+  background: #0f172a;
+}
+
+.confirm-card-wide {
+  max-width: 42rem;
+}
+
+.confirm-copy {
+  margin-top: 0.7rem;
+  font-size: 0.92rem;
+  color: var(--ubis-muted);
+}
+
+.confirm-actions {
+  margin-top: 1.4rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.detail-grid {
+  margin-top: 1.1rem;
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+}
+
+.detail-item {
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 0.95rem;
+  background: rgba(248, 250, 252, 0.88);
+  padding: 0.85rem 0.9rem;
+}
+
+.detail-item span {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ubis-muted);
+}
+
+.detail-item strong {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.95rem;
+  color: var(--ubis-ink);
+}
+
+.toast-item {
+  width: 19rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: rgba(255, 255, 255, 0.96);
+  padding: 0.95rem 1rem;
+  box-shadow: var(--ubis-shadow-lg);
+  animation: slideUp 220ms ease;
+}
+
+.dark .toast-item {
+  border-color: rgba(51, 65, 85, 0.9);
+  background: rgba(15, 23, 42, 0.96);
+}
+
+.toast-success {
+  border-color: rgba(34, 197, 94, 0.2);
+}
+
+.toast-error {
+  border-color: rgba(239, 68, 68, 0.22);
+}
+
+.empty-state-cell {
+  padding: 1.15rem 0.9rem !important;
+  text-align: center;
+  color: var(--ubis-muted);
+}
+
+input[type="checkbox"] {
+  accent-color: var(--ubis-teal);
+}
+
+.dark .page-title-band {
+  background: linear-gradient(135deg, rgba(6, 174, 184, 0.2), rgba(30, 41, 59, 0.7)) !important;
+  color: #fff !important;
+}
+
+@media (max-width: 767px) {
+  .page-title-band {
+    font-size: 1.45rem !important;
+    padding: 1rem 1.1rem !important;
+  }
+
+  .panel-title {
+    font-size: 1.1rem;
+  }
+
+  .top-tab,
+  .nav-link,
+  .nav-section {
+    font-size: 0.88rem;
+  }
+
+  .demo-table td,
+  .demo-table th {
+    white-space: nowrap;
+  }
+
+  .table-toolbar-field,
+  .table-toolbar-field-compact {
+    min-width: 100%;
+  }
+
+  .header-alert-btn {
+    padding-inline: 0.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.pre-budget-toolbar {
+  display: grid;
+  gap: 0.85rem;
+  width: 100%;
+  /* Demand/Appendix screen (client request 2026-08-25): each column should take 50% width. */
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 640px) {
+  .pre-budget-toolbar {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pre-budget-status-bar {
+  padding: 0.95rem 1.35rem 0;
+}
+
+.pre-budget-main {
+  padding: 1.35rem;
+}
+
+.pre-budget-frame-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 1rem;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--ubis-shadow-sm);
+}
+
+.pre-budget-frame {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 1px;
+  height: auto;
+  border: 0;
+  background: #fff;
+}
+
+.pre-budget-partial-view {
+  width: 100%;
+  min-width: 0;
+}
+
+.pre-budget-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border: 1px dashed rgba(148, 163, 184, 0.5);
+  border-radius: 1.1rem;
+  background: rgba(248, 250, 252, 0.86);
+  padding: 1.35rem;
+  color: var(--ubis-copy);
+}
+
+.pre-budget-placeholder.is-compact {
+  margin: 0;
+}
+
+.pre-budget-placeholder h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 900;
+  color: var(--ubis-navy);
+}
+
+.pre-budget-placeholder p {
+  margin: 0.3rem 0 0;
+  font-size: 0.92rem;
+}
+
+/* Client report 2026-08-27: ".pre-budget-placeholder"'s background stays light in dark mode
+   (rgba(248,250,252,0.86), never overridden), but this paragraph's text uses --ubis-copy, which
+   dark mode redefines to a light slate - light text on a light box, invisible until selected.
+   Background left as-is; text forced black to match, same fix as .dark .btn-secondary above. */
+.dark .pre-budget-placeholder p {
+  color: #000;
+}
+
+.pre-budget-placeholder-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  background: rgba(6, 174, 184, 0.1);
+  color: var(--ubis-navy);
+  flex: 0 0 auto;
+}
+
+.pre-budget-placeholder-icon svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.embed-mode #appFrame {
+  padding-left: 0 !important;
+}
+
+.embed-mode #main {
+  padding: 0 !important;
+}
+
+.embed-mode .panel {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.appendix-action-control {
+  gap: 0.45rem;
+}
+
+.appendix-action-control i,
+.appendix-action-control svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex: 0 0 auto;
+}
+
+.appendix-action-button,
+.appendix-action-link {
+  transition: transform var(--ubis-transition), box-shadow var(--ubis-transition), color var(--ubis-transition), background-color var(--ubis-transition), border-color var(--ubis-transition);
+}
+
+.appendix-action-button:hover,
+.appendix-action-link:hover {
+  transform: translateY(-1px);
+}
+
+.appendix-action-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.38rem;
+  min-height: 2rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(203, 213, 225, 0.75);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--ubis-shadow-sm);
+  text-decoration: none;
+}
+
+.appendix-action-edit {
+  color: #1d4ed8 !important;
+}
+
+.appendix-action-delete {
+  color: #b91c1c !important;
+}
+
+.appendix-action-cancel {
+  color: #6d28d9 !important;
+}
+
+.appendix-action-save {
+  color: #0f766e !important;
+}
+
+.appendix-action-add {
+  color: var(--ubis-navy) !important;
+}
+
+.appendix-action-edit:hover,
+.appendix-action-add:hover {
+  background: #eff6ff;
+  border-color: rgba(59, 130, 246, 0.22);
+}
+
+.appendix-action-delete:hover {
+  background: #fef2f2;
+  border-color: rgba(220, 38, 38, 0.22);
+}
+
+.appendix-action-cancel:hover {
+  background: #f5f3ff;
+  border-color: rgba(124, 58, 237, 0.2);
+}
+
+.appendix-action-save:hover {
+  background: #ecfeff;
+  border-color: rgba(13, 148, 136, 0.2);
+}
+
+/* Appendix table action icons */
+.appendix-action-control {
+  display: inline-flexbox;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-width: 2.2rem;
+}
+.appendix-action-button {
+  cursor: pointer;
+}
+.appendix-action-reset {
+  color: #1d4ed8 !important;
+}
+.appendix-action-reset:hover {
+  background: #eff6ff;
+  border-color: rgba(59, 130, 246, 0.22);
+}
+.demo-table td[data-actions] {
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* Editable appendix table rows */
+.demo-table tr.is-editing td:not([data-actions]) {
+  background: rgba(6, 174, 184, 0.06);
+}
+
+.demo-table td.editable-cell {
+  outline: 2px solid rgba(6, 174, 184, 0.45);
+  outline-offset: -2px;
+  cursor: text;
+}
+
+.demo-table td.editable-cell:focus {
+  outline-color: #06aeb8;
+  background: rgba(6, 174, 184, 0.1);
+}
+
+/* Input-based table editing */
+.demo-table tr.is-editing td:not([data-actions]) {
+  background: rgba(6, 174, 184, 0.06);
+  vertical-align: middle;
+}
+
+.appendix-cell-editor {
+  width: 100%;
+  min-width: 6rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  padding: 0.45rem 0.6rem;
+  color: #0f172a;
+  font: inherit;
+  line-height: 1.35;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.appendix-cell-editor:focus {
+  border-color: #06aeb8;
+  box-shadow: 0 0 0 3px rgba(6, 174, 184, 0.14);
+}
+
+.dark .appendix-cell-editor {
+  border-color: #475569;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.heading-bg {
+background: #2A7B9B;
+background: linear-gradient(90deg, rgba(42, 123, 155, 1) 0%, rgba(87, 199, 133, 1) 100%);
+color: white;
+position: relative;
+
+}
+
+
+.btn-delete {
+  border: 1px solid rgba(255, 71, 71, 0.9);
+  background:transparent;
+  color: red;
+  padding: 4px 10px;
+  border-radius: 5px;
+}
+
+.btn-delete:hover {
+  background-color: red;
+  color: #fff;
+
+}
+
+.btn-edit {
+  border: 1px solid rgba(33, 76, 155, 0.9);
+  background:transparent;
+  color: rgba(33, 76, 155, 0.9);
+  padding: 4px 10px;
+  border-radius: 5px;
+}
+
+.btn-edit:hover {
+  background-color:   rgba(33, 76, 155, 0.9);
+  color: #fff;
+
+}
+
+/* Modal dialog — ported from wwwroot/css/login.css's #changePasswordDialog/#forgotPasswordDialog
+   (2026-08-18, per client request to reuse the login screen's dialog styling/format for the ECL
+   Add Actuals modal). login.css is only loaded on the anonymous login-flow views, so these classes
+   live here too for use across the authenticated app shell. Keep both copies in sync if the visual
+   style changes. */
+.modal-backdrop {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(5, 32, 49, .56);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.modal-backdrop.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.verify-modal {
+  width: min(100%, 720px);
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: var(--ubis-shadow-lg);
+  transform: translateY(12px) scale(.98);
+  transition: transform 180ms ease;
+}
+
+.is-open .verify-modal {
+  transform: translateY(0) scale(1);
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 26px 26px 16px;
+  border-bottom: 1px solid #edf1f5;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: var(--ubis-navy);
+  font-size: 1.35rem;
+}
+
+.modal-header p {
+  margin: 5px 0 0;
+  color: var(--ubis-muted);
+  font-size: .9rem;
+  line-height: 1.45;
+}
+
+.close-modal {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 9px;
+  background: #f3f7fa;
+  color: var(--ubis-copy);
+  cursor: pointer;
+}
+
+.modal-body {
+  padding: 22px 26px 26px;
+}
+
+.modal-body .error {
+  display: block;
+  min-height: 19px;
+  margin: 0 0 6px;
+  color: #dc2626;
+  font-size: .8rem;
+  font-weight: 800;
+}
+
+.verify-field {
+  margin-top: 20px;
+}
+
+.verify-field label {
+  display: block;
+  margin-bottom: 7px;
+  color: #60728d;
+  font-size: .76rem;
+  font-weight: 800;
+  letter-spacing: .025em;
+  text-transform: uppercase;
+}
+
+.verify-field input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #cad9e5;
+  border-radius: 12px;
+  padding: 0 13px;
+  outline: none;
+}
+
+.verify-field input:focus {
+  border-color: var(--ubis-teal);
+  box-shadow: 0 0 0 4px rgba(6, 174, 184, .12);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.modal-actions button {
+  min-height: 42px;
+  border-radius: 11px;
+  padding: 0 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.modal-actions .cancel {
+  border: 1px solid #d5e0e8;
+  background: #fff;
+  color: var(--ubis-copy);
+}
+
+.modal-actions .confirm {
+  border: 0;
+  background: var(--ubis-navy);
+  color: #fff;
+}
+
+/* ECL Saved Scheme Outlays grid — row color scheme (client spec 2026-08-18), matches the legend
+   directly below the grid. Precedence (checked in this order in AddSchemeOutlay.cshtml's
+   RowColorClass): reapproval-requested, rejected, approved, sent-for-approval; no class at all for
+   a never-submitted draft (plain white row). */
+.ecl-row-sent {
+  background-color: #f5c26b;
+}
+
+.ecl-row-approved {
+  background-color: #90ee90;
+}
+
+.ecl-row-rejected {
+  background-color: #f4a6a6;
+}
+
+.ecl-row-reapproval {
+  background-color: #a9d6f5;
+}
+
+.ecl-legend-approved {
+  color: #15803d;
+}
+
+.ecl-legend-rejected {
+  color: #dc2626;
+}
+
+.ecl-legend-sent {
+  color: #b45309;
+}
+
+.ecl-legend-reapproval {
+  color: #38bdf8;
+}
+
+.ecl-file-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0.2rem;
+}
+
+.ecl-file-icon svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+#savedOutlaysTable tbody tr[hidden] {
+  display: none;
+}
+
+/* Client request 2026-08-19: this grid's headers should read in Capital Case as written in the
+   markup, not the all-caps .demo-table thead th default every other data table in the app uses -
+   scoped to this table's own ID so nothing else is affected. */
+#savedOutlaysTable thead th {
+  text-transform: none;
+}
+
+/* Client request 2026-08-19: with ~22 columns (5 fixed + 10 year-outlay + 7 more), the table
+   needs table-layout:fixed so the <colgroup> percentage widths above are actually honored (the
+   default "auto" layout ignores col widths and sizes columns to fit their content instead, which
+   is what caused the horizontal scroll in the first place). Text columns wrap onto multiple lines
+   within their narrowed width rather than forcing the column wider or overflowing. */
+#savedOutlaysTable {
+  table-layout: fixed;
+}
+
+#savedOutlaysTable td,
+#savedOutlaysTable th {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* Client request 2026-08-19: shrink grid text by 1pt from its previous size (header 0.76rem/9.12pt
+   -> 8.12pt, cell text 0.88rem/10.56pt -> 9.56pt, action buttons 0.75rem/9pt -> 8pt), and the Add
+   Actuals button specifically by 2pt total (9pt -> 7pt) since it was called out separately. 1pt =
+   4/3px at the standard 96dpi CSS reference, so e.g. 8.12pt = 10.827px = 0.677rem at a 16px root. */
+#savedOutlaysTable thead th {
+  font-size: 0.677rem;
+}
+
+#savedOutlaysTable tbody td {
+  font-size: 0.797rem;
+}
+
+#savedOutlaysTable td button.btn-secondary {
+  font-size: 0.667rem;
+}
+
+#savedOutlaysTable td button[data-open-actuals-modal] {
+  font-size: 0.583rem;
+}
+
+/* Client request 2026-08-19: Add Actuals needs to be noticeably wider than the base .verify-modal
+   (720px) to comfortably fit all 10 year columns side by side - scoped to this modal's own ID so
+   the shared .verify-modal size (used by login's change/forgot-password dialogs and the ECL
+   file-preview modal) is unaffected. */
+#addActualsModal .verify-modal {
+  width: min(96%, 1100px);
+}
+
+/* Client request 2026-08-19: the 10 year-input textboxes were overflowing their modal
+   horizontally because the table had min-w-max (sized to fit content instead of the container) -
+   table-layout:fixed forces all 10 columns to divide the modal's own width evenly instead, which
+   guarantees they all fit without a horizontal scrollbar regardless of screen size. On top of that,
+   each input is set to half its column's width (centered) per the explicit "reduce by half" ask. */
+#addActualsTable {
+  table-layout: fixed;
+}
+
+#addActualsInputRow input.input {
+  width: 50%;
+  margin: 0 auto;
+}
+
+/* Client request 2026-08-19: same min-w-max-caused horizontal-scroll problem as the Add Actuals
+   modal and the Saved Scheme Outlays grid, this time on the entry form's own Outlay grid -
+   table-layout:fixed divides the 10 year columns evenly across the table's own (already
+   full-width) container instead of sizing to each input's content. */
+#outlayGridTable {
+  table-layout: fixed;
+}
+
+/* Client request 2026-08-19: same min-w-max-caused horizontal-scroll problem as the other ECL
+   grids fixed above, this time on the ECL Report grid (Data Analysis / Demand Wise ECL Status /
+   Pending Demand, which all share this partial) - table-layout:fixed plus the <colgroup> widths
+   above make it fit at 100% width. Demand and Scheme wrap onto multiple lines within their column
+   instead of forcing it wider, since those are the two free-text-ish columns most likely to
+   overflow with a long "DemandNo - DemandName"/"SchemeSrNo - SchemeName" label. */
+#eclReportGrid {
+  table-layout: fixed;
+}
+
+#eclReportGrid td:nth-child(3),
+#eclReportGrid td:nth-child(4) {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* Client request 2026-08-20: same min-w-max-caused horizontal-scroll problem as the other ECL
+   grids fixed above, this time on the ECL Data Approve grid - table-layout:fixed makes it fit at
+   100% width without a horizontal scrollbar. Scheme is the one free-text-ish column most likely to
+   overflow (SchemeSrNo - SchemeName), so it wraps onto multiple lines within its column instead of
+   forcing the table wider (or, without this, spilling visually into the next column when a single
+   long unbroken token like "Improvement/Modifications" has nowhere else to break - bug report
+   2026-08-27).
+   Scheme was column 3 (after Sr.No./Financial Year) when this rule was first written; both of
+   those columns were removed from DataToApprove.cshtml on 2026-08-27, making Scheme column 1 -
+   updated to match, or this rule silently applies to whatever now sits in the stale position
+   instead (here, Central Share, which never needed it) while Scheme goes right back to overflowing. */
+#dataToApproveTable {
+  table-layout: fixed;
+}
+
+#dataToApproveTable td:nth-child(1) {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* Client request 2026-08-27: Scheme wider (see the inline width:340px on its th/td in
+   DataToApprove.cshtml), the 10 per-year outlay columns narrower - they only ever hold a short
+   right-aligned amount, unlike Scheme's free text. */
+#dataToApproveTable .outlay-year-col {
+  width: 64px;
+}
+
+#dataForReapprovalTable {
+  table-layout: fixed;
+}
+
+#dataForReapprovalTable td:nth-child(3) {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+#savedOutlaysPagination button {
+  min-width: 2rem;
+  min-height: 2rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(203, 213, 225, 0.85);
+  background: #fff;
+  color: var(--ubis-copy);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#savedOutlaysPagination button.is-active {
+  background: var(--ubis-navy);
+  border-color: var(--ubis-navy);
+  color: #fff;
+}
+
+#savedOutlaysPagination button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
